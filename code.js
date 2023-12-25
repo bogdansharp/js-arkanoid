@@ -235,22 +235,24 @@ class GameController {
         this.keyListener = this.keyListener.bind(this);
         document.addEventListener('keydown', this.keyListener, false);
         // Game steps
-        this.interval = 0;
-        this.STEP_INTERVAL = 100;
+        this.step = this.step.bind(this);
+        this.timer = 0;
         this.perfTime = performance.now();
-        this.interval = setInterval(this.step.bind(this), this.STEP_INTERVAL);
+        this.timer = requestAnimationFrame(this.step);
     }
     step() {
-        this.perfTime = performance.now();
         if (this.m.state == 2) { // Game over
-            if (this.interval) {
-                clearInterval(this.interval); }
+            if (this.timer) {
+                window.cancelAnimationFrame(this.timer); }
             this.v.endGame();
             return;
         }
-        this.m.timeStep(this.STEP_INTERVAL);
+        var newTime = performance.now();
+        this.m.timeStep(newTime - this.perfTime);
+        this.perfTime = newTime;
         this.v.drawPaddle();
         this.v.drawBall();
+        this.timer = requestAnimationFrame(this.step);
     }
     keyListener(e) {
         var key = e.keyCode;
@@ -264,8 +266,8 @@ class GameController {
     }
     kill() {
         document.removeEventListener('keydown', this.keyListener, false);
-        if (this.interval) {
-            clearInterval(this.interval); }
+        if (this.timer) {
+            window.cancelAnimationFrame(this.timer); }
     }
 }
 
