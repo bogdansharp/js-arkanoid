@@ -7,6 +7,8 @@ class GameModel {
         this.err = 0; // OK
         this.errMsg = ''; // OK
         this.score = 0;
+        this.scoreInterval = 1000; // 1 score for speed 0.1 each 1s
+        this.speedInterval = 20 * 1000; // speed up each 20s
         if (width < MIN_WIDTH || height < MIN_HEIGHT) {
             this.err = 1; // ERROR
             this.errMsg = 'Width or Height is not enough for game';
@@ -25,6 +27,7 @@ class GameModel {
         this.paddleRight = this.paddleX + this.paddleHalf;
         // ball
         this.speed = 0.1;
+        this.speedExtra = 0.0;
         this.angle = Math.PI / 3.0;
         this.ballRadius = 8;
         this.ballDiam = this.ballRadius * 2;
@@ -40,6 +43,8 @@ class GameModel {
         this.vp.push({y1: 0, y2: this.height + this.footerHeight, x: this.width, type: 1});
         this.eq = [];
         this.eq.push({type: 3, time: this.time}); // horizontal bounce
+        this.eq.push({type: 7, time: this.time + this.scoreInterval}); // score for time
+        this.eq.push({type: 8, time: this.time + this.speedInterval});  // speed up 
         // start game
         if (! this.err) {
             this.state = 1; // ACTIVE
@@ -52,6 +57,8 @@ class GameModel {
         this.eq.push({type: 2, time: this.time + delta});
     }
     queueBounce() {
+        this.speed += this.speedExtra;
+        this.speedExtra = 0;
         var sina = Math.sin(this.angle);
         var cosa = Math.cos(this.angle);
         var minHTime = Infinity, minVTime = Infinity;
@@ -68,7 +75,6 @@ class GameModel {
                 continue;
             var dtime = vdist / Math.abs(vspeed);
             var nextX = this.ballX + hspeed * dtime;
-            console.log(`hp[${i}] dtime=${dtime} X=${this.ballX} nextX=${nextX.toFixed(4)}`);
             if (nextX > segment.x2 || nextX < segment.x1)
                 continue;
             if (dtime < minHTime) {
@@ -86,7 +92,6 @@ class GameModel {
                 continue;
             var dtime = hdist / Math.abs(hspeed);
             var nextY = this.ballY + vspeed * dtime;
-            console.log(`vp[${i}] dtime=${dtime} Y=${this.ballY} nextY=${nextY.toFixed(4)}`);
             if (nextY > segment.y2 || nextY < segment.y1)
                 continue;
             if (dtime < minVTime) {
@@ -94,7 +99,6 @@ class GameModel {
                 minVTime = dtime;
             }
         }
-        console.log(`bounce time = ${this.time} angle=${this.angle.toFixed(4)} minVTime=${minVTime.toFixed(4)} minHTime=${minHTime.toFixed(4)}`);
         if (minHTime == Infinity && minVTime == Infinity)
             return;
         if (minHTime < minVTime) {
@@ -105,7 +109,7 @@ class GameModel {
         }
     }
     processEvent(ev) {
-        console.log(ev)
+        console.log(ev);
         switch (ev.type) {
             case 1: // paddle left
                 this.paddleLeft -= 32;
@@ -131,18 +135,27 @@ class GameModel {
                     if (this.ballX <= this.paddleRight && this.ballX >= this.paddleLeft) {
                         this.angle = - this.angle;
                     } else {
-                        // game over
+                        // paddle misses the ball
                         var sina = Math.sin(this.angle);
-                        var vspeed = this.speed * sina;
+                        var vspeed = (this.speed + this.speedExtra) * sina;
                         this.eq.push({type: 6, time: this.time + this.footerHeight / vspeed});
+                        this.hp.splice(1, 1); // prevent event type 5 duplication
                     }
                 } else if (ev.type == 4) { // vertical bounce 
                     this.angle = Math.PI - this.angle;
                 }
                 this.queueBounce();
                 break;
-            case 6:
+            case 6: // game over
                 this.state = 2; // GAME LOST
+                break;
+            case 7: // score for time
+                this.score += Math.round(this.speed * 10);
+                this.eq.push({type: 7, time: this.time + this.scoreInterval}); 
+                break;
+            case 8: // speed up
+                this.speedExtra += 0.1;
+                this.eq.push({type: 8, time: this.time + this.speedInterval}); 
                 break;
         }
     }
@@ -212,6 +225,7 @@ class GameView {
         this.ball.style.top = `${Math.round(this.m.ballTop)}px`;
         this.ball.style.left = `${Math.round(this.m.ballLeft)}px`;
         this.paddle.style.left = `${Math.round(this.m.paddleLeft)}px`;
+        this.scoreval.innerHTML = this.m.score;
     }
     endGame() {
         this.ball.style.visibility = 'hidden';
@@ -237,8 +251,6 @@ class GameController {
     }
     step() {
         if (this.m.state == 2) { // Game over
-            if (this.timer) {
-                window.cancelAnimationFrame(this.timer); }
             this.v.endGame();
             return;
         }
