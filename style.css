@@ -1,0 +1,44 @@
+.main {
+    font-family: Verdana, Geneva, Tahoma, sans-serif;
+}
+
+.main #info {
+    position: absolute;
+    width: 100%;
+    font-size: 14px;
+}
+
+.main #score {
+    margin-left: 10px;
+}
+
+.main #status {
+    float: right;
+    margin-right: 10px;
+}
+
+.main #game {
+    position: absolute;
+    background-color: gainsboro;
+    border: 1px black solid;
+    top: 10px;
+    left: 10px;
+}
+
+.main #paddle {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    background-color: coral;
+}
+
+.main #ball {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    border-radius: 1px;
+    background-color: cornflowerblue;
+}
+
+.msg-ok { color: green; }
+.msg-err { color: red; }
