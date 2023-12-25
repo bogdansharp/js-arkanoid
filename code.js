@@ -200,25 +200,20 @@ class GameView {
         this.ball.style.width = `${this.m.ballDiam}px`;
         this.ball.style.height = `${this.m.ballDiam}px`;
         this.ball.style.borderRadius = `${this.m.ballRadius}px`;
-        this.drawBall();
         // paddle
         this.paddle = document.getElementById("paddle");
         this.paddle.style.width = `${this.m.paddleWidth}px`;
         this.paddle.style.height = `${this.m.paddleHeight}px`;
         this.paddle.style.top = `${this.m.paddleTop}px`;
-        this.drawPaddle();
-        
+        // draw objects
+        this.render();
     }
-    drawPaddle() {
-        this.paddle.style.left = `${Math.round(this.m.paddleLeft)}px`;
-    }
-    drawBall() {
+    render() {
         this.ball.style.top = `${Math.round(this.m.ballTop)}px`;
         this.ball.style.left = `${Math.round(this.m.ballLeft)}px`;
+        this.paddle.style.left = `${Math.round(this.m.paddleLeft)}px`;
     }
     endGame() {
-        this.drawBall();
-        this.drawPaddle();
         this.ball.style.visibility = 'hidden';
         this.status.innerHTML = "Game Over";
         this.status.classList.remove('msg-ok');
@@ -250,8 +245,7 @@ class GameController {
         var newTime = performance.now();
         this.m.timeStep(newTime - this.perfTime);
         this.perfTime = newTime;
-        this.v.drawPaddle();
-        this.v.drawBall();
+        this.v.render();
         this.timer = requestAnimationFrame(this.step);
     }
     keyListener(e) {
