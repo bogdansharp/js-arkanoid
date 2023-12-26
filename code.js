@@ -56,6 +56,9 @@ class GameModel {
     movePaddleRight(delta) {
         this.eq.push({type: 2, time: this.time + delta});
     }
+    movePaddlePos(delta, pos) {
+        this.eq.push({type: 9, time: this.time + delta, param: pos});
+    }
     queueBounce() {
         this.speed += this.speedExtra;
         this.speedExtra = 0;
@@ -124,6 +127,23 @@ class GameModel {
                     this.paddleRight = this.width; }
                 this.paddleLeft = this.paddleRight - this.paddleWidth;
                 this.paddleX = this.paddleLeft + this.paddleHalf;
+                break;
+            case 9: // paddle move to pos (mouse or touch)
+                var newX = ev.param;
+                if (newX + this.paddleHalf > this.width) {
+                    newX = this.width - this.paddleHalf; }
+                if (newX - this.paddleHalf < 0) {
+                    newX = this.paddleHalf; }
+                // if (newX > this.paddleX) {
+                //     if (newX - this.paddleX > 10)
+                //         newX = this.paddleX + 10;
+                // } else {
+                //     if (this.paddleX - newX > 10)
+                //         newX = this.paddleX - 10;
+                // }
+                this.paddleX = newX;
+                this.paddleLeft = newX - this.paddleHalf;
+                this.paddleRight = newX + this.paddleHalf;
                 break;
             case 3: // horizontal bounce
             case 5: // horizontal paddle bounce
@@ -240,14 +260,33 @@ class GameController {
         // Model, View
         this.m = model;
         this.v = view;
+        var rect = this.v.game.getBoundingClientRect();
+        this.gameAreaShift = rect.left;
         // Key handlers
         this.keyListener = this.keyListener.bind(this);
         document.addEventListener('keydown', this.keyListener, false);
+        // mouse
+        this.isDrag = false;
+        this.mouseDown = this.mouseDown.bind(this);
+        this.mouseMove = this.mouseMove.bind(this);
+        this.mouseUp = this.mouseUp.bind(this);
+        this.v.game.addEventListener('mousedown', this.mouseDown, false);
+        this.v.game.addEventListener('mousemove', this.mouseMove, false);
+        this.v.game.addEventListener('mouseup', this.mouseUp, false);
+        // touch
+        this.v.game.addEventListener('touchstart', this.mouseDown, false);
+        this.v.game.addEventListener('touchmove', this.mouseMove, false);
+        this.v.game.addEventListener('touchend', this. mouseUp, false);
         // Game steps
         this.step = this.step.bind(this);
         this.timer = 0;
         this.perfTime = performance.now();
         this.timer = requestAnimationFrame(this.step);
+    }
+    kill() {
+        document.removeEventListener('keydown', this.keyListener, false);
+        if (this.timer) {
+            window.cancelAnimationFrame(this.timer); }
     }
     step() {
         if (this.m.state == 2) { // Game over
@@ -270,10 +309,20 @@ class GameController {
             this.m.movePaddleRight(delta);
         }
     }
-    kill() {
-        document.removeEventListener('keydown', this.keyListener, false);
-        if (this.timer) {
-            window.cancelAnimationFrame(this.timer); }
+    mouseDown(e) {
+        this.isDrag = true;
+    }
+    mouseUp(e) {
+        this.isDrag = false;
+    }
+    mouseMove(e) {
+        if (this.isDrag) {
+            e.preventDefault();
+            var delta = Math.round(performance.now() - this.perfTime);
+            var posX = e.clientX || e.targetTouches[0].pageX;
+            //console.log(`posx= ${posX}`);
+            this.m.movePaddlePos(delta, posX - this.gameAreaShift);
+        }
     }
 }
 
