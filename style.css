@@ -27,6 +27,7 @@
 
 .main #paddle {
     position: absolute;
+    cursor: pointer;
     width: 1px;
     height: 1px;
     background-color: coral;
@@ -42,3 +43,46 @@
 
 .msg-ok { color: green; }
 .msg-err { color: red; }
+
+.main #controls{
+    position: absolute;
+    z-index: 5;
+    top: 40px;
+    width: 200px;
+    margin-left: calc((100% - 216px)/2);
+    padding-bottom: 5px;
+    text-align: center;
+    background-color: white;
+    box-shadow: 5px 5px 10px gray;
+    /*display: none;*/
+}
+.main #controls h3{
+    color: white;
+    background-color: cornflowerblue;
+    padding: 10px 5px;
+    margin-top: 0px;
+}
+.main #controls button, #controls select{
+    border: 1px black solid;
+    margin: 5px;
+    padding: 5px;
+    min-width: 100px;
+    font-size: medium;
+    cursor: pointer;
+}
+.main #controls fieldset{
+    text-align: left;
+    width: 70%;
+    margin: 10px auto;
+    line-height: 1.5em;
+}
+.main #controls input[type='checkbox'] {
+    float: right;
+    cursor: pointer;
+}
+
+.main #gear{
+    margin-right: 10px;
+    float: right;
+    cursor: pointer;
+}

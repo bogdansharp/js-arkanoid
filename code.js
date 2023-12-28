@@ -2,6 +2,7 @@ class GameModel {
     constructor(width, height) {
         const MIN_WIDTH = 128;
         const MIN_HEIGHT = 64;
+        // 0 - init, 1 - active, 2 - pause, 3 - missed, 666 - game over
         this.state = 0; // INITIALIZATION
         this.time = 0;
         this.err = 0; // OK
@@ -34,17 +35,21 @@ class GameModel {
         this.ballX = this.width / 2;
         this.ballY = this.height - this.ballRadius;
         this.moveBall(0);
-        //
+        // horizontal planes
         this.hp = [];
         this.hp.push({y: 0, x1: 0, x2: this.width, type: 1});
         this.hp.push({y: this.height, x1: 0, x2: this.width, type: 2});
+        // vertical planes
         this.vp = [];
         this.vp.push({y1: 0, y2: this.height + this.footerHeight, x: 0, type: 1});
         this.vp.push({y1: 0, y2: this.height + this.footerHeight, x: this.width, type: 1});
+        // game evens queue
         this.eq = [];
         this.eq.push({type: 3, time: this.time}); // horizontal bounce
         this.eq.push({type: 7, time: this.time + this.scoreInterval}); // score for time
         this.eq.push({type: 8, time: this.time + this.speedInterval});  // speed up 
+        // sound effects queue
+        this.sq = [];
         // start game
         if (! this.err) {
             this.state = 1; // ACTIVE
@@ -105,10 +110,17 @@ class GameModel {
         if (minHTime == Infinity && minVTime == Infinity)
             return;
         if (minHTime < minVTime) {
-            let eventType = this.hp[minHIdx].type == 2 ? 5 : 3; 
-            this.eq.push({type: eventType, time: this.time + minHTime}); // horizontal bounce
+            if (this.hp[minHIdx].type == 2) { // paddle line
+                if (this.state != 3) {
+                    this.eq.push({type: 5, time: this.time + minHTime}); // paddle bounce
+                }
+            } else { // top horizontal line
+                this.eq.push({type: 3, time: this.time + minHTime}); // horizontal bounce
+                this.sq.push({type: 3, time: this.time + minHTime, sound: 'bounce'});
+            }
         } else {
             this.eq.push({type: 4, time: this.time + minVTime}); // vertical bounce
+            this.sq.push({type: 4, time: this.time + minVTime, sound: 'bounce'});
         }
     }
     processEvent(ev) {
@@ -154,12 +166,15 @@ class GameModel {
                 } else if (ev.type == 5) { // horizontal paddle bounce
                     if (this.ballX <= this.paddleRight && this.ballX >= this.paddleLeft) {
                         this.angle = - this.angle;
+                        this.sq.push({type: 5, time: this.time, sound: 'paddle'});
                     } else {
                         // paddle misses the ball
                         var sina = Math.sin(this.angle);
                         var vspeed = (this.speed + this.speedExtra) * sina;
-                        this.eq.push({type: 6, time: this.time + this.footerHeight / vspeed});
-                        this.hp.splice(1, 1); // prevent event type 5 duplication
+                        var gameEndTime = Math.round(this.time + this.footerHeight / vspeed);
+                        this.eq.push({type: 6, time: gameEndTime});
+                        this.sq.push({type: 6, time: gameEndTime, sound: 'gameOver'});
+                        this.state = 3; // BALL MISSED
                     }
                 } else if (ev.type == 4) { // vertical bounce 
                     this.angle = Math.PI - this.angle;
@@ -167,7 +182,7 @@ class GameModel {
                 this.queueBounce();
                 break;
             case 6: // game over
-                this.state = 2; // GAME LOST
+                this.state = 666; // GAME LOST
                 break;
             case 7: // score for time
                 this.score += Math.round(this.speed * 10);
@@ -225,21 +240,31 @@ class GameView {
         this.info.style.top = 'auto';
         this.scoreval = document.getElementById("scoreval");
         this.status = document.getElementById("status");
-        this.status.innerHTML = "Level 1";
-        this.status.classList.remove('msg-err');
-        this.status.classList.add('msg-ok');
         // ball
         this.ball = document.getElementById("ball");
         this.ball.style.width = `${this.m.ballDiam}px`;
         this.ball.style.height = `${this.m.ballDiam}px`;
         this.ball.style.borderRadius = `${this.m.ballRadius}px`;
+        this.newGame();
         // paddle
         this.paddle = document.getElementById("paddle");
         this.paddle.style.width = `${this.m.paddleWidth}px`;
         this.paddle.style.height = `${this.m.paddleHeight}px`;
         this.paddle.style.top = `${this.m.paddleTop}px`;
+        // Initialize Audio
+        this.soundKeys = ['bounce', 'bounce2', 'paddle', 'gameOver', 'music'];
+        this.sounds = {};
+        this.soundInitialized = false;
         // draw objects
         this.render();
+    }
+    initSound() {
+        for (const key of this.soundKeys) {
+            let sound = new Audio(`sound/${key}.mp3`);
+            sound.volume = 0;
+            sound.play().then(async () => { sound.pause(); sound.volume = 1; });
+            this.sounds[key] = sound;
+        }
     }
     render() {
         this.ball.style.top = `${Math.round(this.m.ballTop)}px`;
@@ -247,11 +272,41 @@ class GameView {
         this.paddle.style.left = `${Math.round(this.m.paddleLeft)}px`;
         this.scoreval.innerHTML = this.m.score;
     }
+    newGame() {
+        this.ball.style.visibility = 'visible';
+        this.status.innerHTML = "Level 1";
+        this.status.classList.remove('msg-err');
+        this.status.classList.add('msg-ok');
+    }
     endGame() {
         this.ball.style.visibility = 'hidden';
         this.status.innerHTML = "Game Over";
         this.status.classList.remove('msg-ok');
         this.status.classList.add('msg-err');
+    }
+    playSound(sound) {
+        console.log(`play ${sound} obj=${this.sounds[sound]}`)
+        if (sound in this.sounds)
+            this.sounds[sound].play();
+    }
+    playMusic(on) {
+        if ('music' in this.sounds) {
+            console.log(`obj=${this.sounds['music']} on=${on}`);
+            var music = this.sounds['music'];
+            if (on) {
+                music.loop = true;
+                if (music.readyState >= 2)
+                    music.play();
+                else
+                    music.addEventListener('canplaythrough', this.playMusicWhenReady, false);
+            } else {
+                document.removeEventListener('canplaythrough', this.playMusicWhenReady, false);
+                music.pause();
+            }
+        }
+    }
+    playMusicWhenReady(e) {
+        e.target.play();
     }
 }
 
@@ -276,12 +331,33 @@ class GameController {
         // touch
         this.v.game.addEventListener('touchstart', this.mouseDown, false);
         this.v.game.addEventListener('touchmove', this.mouseMove, false);
-        this.v.game.addEventListener('touchend', this. mouseUp, false);
+        this.v.game.addEventListener('touchend', this.mouseUp, false);
         // Game steps
         this.step = this.step.bind(this);
         this.timer = 0;
         this.perfTime = performance.now();
         this.timer = requestAnimationFrame(this.step);
+        // Settings
+        this.toPlaySounds = false;
+        this.toPlayMusic = false;
+        // settings element
+        this.PLAN_SOUNDS_TIME = 200;
+        this.gearBtn = document.getElementById("gear");
+        this.doneBtn = document.getElementById("done");
+        this.newBtn = document.getElementById("new");
+        this.controls = document.getElementById("controls");
+        this.active = true;
+        this.controls.hidden = this.active;
+        this.showControls = this.showControls.bind(this);
+        this.gearBtn.addEventListener('click', this.showControls, false);
+        this.doneBtn.addEventListener('click', this.showControls, false);
+        this.newBtn.addEventListener('click', this.newGameClick.bind(this), false);
+        this.soundCheck = document.getElementById("sound");
+        this.musicCheck = document.getElementById("music");
+        this.soundCheck.checked = this.toPlaySounds;
+        this.musicCheck.checked = this.toPlayMusic;
+        this.soundCheck.addEventListener('click', this.setSound.bind(this), false);
+        this.musicCheck.addEventListener('click', this.setMusic.bind(this), false);
     }
     kill() {
         document.removeEventListener('keydown', this.keyListener, false);
@@ -289,12 +365,27 @@ class GameController {
             window.cancelAnimationFrame(this.timer); }
     }
     step() {
-        if (this.m.state == 2) { // Game over
+        if (this.m.state == 666) { // Game over
             this.v.endGame();
             return;
         }
         var newTime = performance.now();
         this.m.timeStep(newTime - this.perfTime);
+        for (let i = 0; i < this.m.sq.length; ++i) { // process sound events
+            var soundEvent = this.m.sq[i];
+            var delta = Math.round(soundEvent.time - this.m.time);
+            if (delta > this.PLAN_SOUNDS_TIME)
+                continue;
+            if (this.toPlaySounds) {
+                console.log(`plan to play ${soundEvent.sound} in ${delta} time`);
+                if (delta <= 0) {
+                    this.v.playSound(soundEvent.sound);
+                } else {
+                    setTimeout(() => { this.v.playSound(soundEvent.sound); }, delta);
+                }
+            }
+            this.m.sq.splice(i, 1);
+        }
         this.perfTime = newTime;
         this.v.render();
         this.timer = requestAnimationFrame(this.step);
@@ -302,18 +393,23 @@ class GameController {
     keyListener(e) {
         var key = e.keyCode;
         var delta = Math.round(performance.now() - this.perfTime);
-        //console.log(`keyDown delta=${delta}`);
         if (key == 37 || key == 65) {
             this.m.movePaddleLeft(delta);
         } else if (key == 39 || key == 68) {
             this.m.movePaddleRight(delta);
+        } else if (e.key === "Escape") {
+            this.showControls();
         }
     }
     mouseDown(e) {
         this.isDrag = true;
+        this.v.game.style.cursor = 'none';
+        this.v.paddle.style.cursor = 'none';
     }
     mouseUp(e) {
         this.isDrag = false;
+        this.v.game.style.cursor = 'default';
+        this.v.paddle.style.cursor = 'pointer';
     }
     mouseMove(e) {
         if (this.isDrag) {
@@ -323,6 +419,41 @@ class GameController {
             //console.log(`posx= ${posX}`);
             this.m.movePaddlePos(delta, posX - this.gameAreaShift);
         }
+    }
+    setSound(e) {
+        this.toPlaySounds = this.soundCheck.checked;
+        if (this.toPlaySounds && 
+            (! this.v.soundInitialized || this.v.sounds['bounce'] == null)) 
+        {
+            this.v.initSound();
+            this.v.soundInitialized = true;
+            console.log('sound initialized');
+        }
+    }
+    setMusic(e) {
+        this.toPlayMusic = this.musicCheck.checked;
+        if (this.toPlayMusic && ! this.v.soundInitialized) {
+            this.v.initSound();
+            this.v.soundInitialized = true;
+        }
+        this.v.playMusic(this.toPlayMusic);
+    }
+    showControls(e) {
+        this.active = ! this.active;
+        this.controls.hidden = this.active;
+        if (! this.active) { // pause
+            if (this.timer) {
+                window.cancelAnimationFrame(this.timer); }
+        } else { // resume
+            this.perfTime = performance.now();
+            this.timer = requestAnimationFrame(this.step);
+        }
+    }
+    newGameClick(e) {
+        this.m = new GameModel(this.m.width, this.m.height + this.m.footerHeight);
+        this.v.m = this.m;
+        this.v.newGame();
+        this.showControls();
     }
 }
 
@@ -336,21 +467,19 @@ class GameApp {
         const BORDER_WIDTH = 10;
         var width = innerWidth - BORDER_WIDTH * 2;
         var height = innerHeight - BORDER_WIDTH * 2;
-        this.m = new GameModel(width, height);
-        this.v = null;
+        var model = new GameModel(width, height);
+        var view = null;
         this.c = null;
-        if (this.m.err) {
-            throw new Error('ERROR:' + this.m.errMsg);
+        if (model.err) {
+            throw new Error('ERROR:' + model.errMsg);
         }
-        this.v = new GameView(this.m, width, height);
-        this.c = new GameController(this.m, this.v);
+        view = new GameView(model, width, height);
+        this.c = new GameController(model, view);
     }
     kill() {
         if (this.c) {
             this.c.kill(); }
         this.c = null;
-        this.v = null;
-        this.m = null;
     }
 }
 
