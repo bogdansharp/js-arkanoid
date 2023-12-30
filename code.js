@@ -2,7 +2,7 @@ class GameModel {
     constructor(width, height) {
         const MIN_WIDTH = 128;
         const MIN_HEIGHT = 64;
-        // 0 - init, 1 - active, 2 - pause, 3 - missed, 666 - game over
+        // states: 0 - init, 1 - active, 2 - pause, 3 - missed, 666 - game over
         this.state = 0; // INITIALIZATION
         this.time = 0;
         this.err = 0; // OK
@@ -29,20 +29,49 @@ class GameModel {
         // ball
         this.speed = 0.1;
         this.speedExtra = 0.0;
-        this.angle = Math.PI / 3.0;
+        // angle = -1.0472 x=46.17 y=581.00
+        // bounce queued x=141.67 y=581.00 dtime=763.85 id=0 angle=4.1888
+        // bounce queued x=333.03 y=8.00 dtime=1449.74 id=0 angle=1.0472
+        this.angle = 1.0472; //Math.PI / 3.0;
         this.ballRadius = 8;
         this.ballDiam = this.ballRadius * 2;
-        this.ballX = this.width / 2;
-        this.ballY = this.height - this.ballRadius;
+        this.ballX = 60; //this.width / 2;
+        this.ballY = 581; //this.height - this.ballRadius;
         this.moveBall(0);
-        // horizontal planes
-        this.hp = [];
-        this.hp.push({y: 0, x1: 0, x2: this.width, type: 1});
-        this.hp.push({y: this.height, x1: 0, x2: this.width, type: 2});
-        // vertical planes
-        this.vp = [];
-        this.vp.push({y1: 0, y2: this.height + this.footerHeight, x: 0, type: 1});
-        this.vp.push({y1: 0, y2: this.height + this.footerHeight, x: this.width, type: 1});
+        // bricks
+        this.bricks = []; // format: [x1, x2, y1, y2, id, type, color]
+        this.bricks.push( // game area
+            [0, this.width, 0, this.height + this.footerHeight, 0, 1, 0xdcdcdc]); 
+        this.BRICK_WIDTH = 40;
+        this.BRICK_HEIGHT = 20;
+        for (let i = 0, type = 2, id = 1,
+            columns = Math.floor(this.width / this.BRICK_WIDTH),
+            line1Top = this.BRICK_HEIGHT * 3,
+            line1Bottom = line1Top + this.BRICK_HEIGHT,
+            line2Top = this.BRICK_HEIGHT * 4,
+            line2Bottom = line2Top + this.BRICK_HEIGHT,
+            line3Top = this.BRICK_HEIGHT * 5,
+            line3Bottom = line3Top + this.BRICK_HEIGHT,
+            line4Top = this.BRICK_HEIGHT * 6,
+            line4Bottom = line4Top + this.BRICK_HEIGHT,
+            line5Top = this.BRICK_HEIGHT * 7,
+            line5Bottom = line5Top + this.BRICK_HEIGHT,
+            line6Top = this.BRICK_HEIGHT * 8,
+            line6Bottom = line6Top + this.BRICK_HEIGHT; 
+            i < columns; ++i) 
+        {
+            if (i == 7) continue;
+            let left = i * this.BRICK_WIDTH;
+            let right = left + this.BRICK_WIDTH;
+            this.bricks.push([left, right, line1Top, line1Bottom, id++, type, 0xff0000]); // red
+            this.bricks.push([left, right, line2Top, line2Bottom, id++, type, 0x00ff00]); // green
+            this.bricks.push([left, right, line3Top, line3Bottom, id++, type, 0x0000ff]); // blue
+            this.bricks.push([left, right, line4Top, line4Bottom, id++, type, 0xff0000]); // red
+            this.bricks.push([left, right, line5Top, line5Bottom, id++, 4, 0xFFD700]); // gold
+            this.bricks.push([left, right, line6Top, line6Bottom, id++, 3, 0xC0C0C0]); // silver
+        }
+        // brick ids to remove (negative numbers - only change color to black)
+        this.bq = [];
         // game evens queue
         this.eq = [];
         this.eq.push({type: 3, time: this.time}); // horizontal bounce
@@ -67,64 +96,120 @@ class GameModel {
     queueBounce() {
         this.speed += this.speedExtra;
         this.speedExtra = 0;
+        if (this.angle > Math.PI) 
+            this.angle -= Math.PI + Math.PI;
         var sina = Math.sin(this.angle);
         var cosa = Math.cos(this.angle);
-        var minHTime = Infinity, minVTime = Infinity;
-        var minHIdx = -1, minVIdx = -1;
+        var minTime = Infinity;
+        var minIdx = -1;
+        var minType = -1;
         var hspeed = this.speed * cosa;
         var vspeed = this.speed * sina;
-        // check all horizontal segments
-        for (let i = 0; i < this.hp.length; ++i) {
-            let segment = this.hp[i];
-            var vdist = sina > 0 ?
-                segment.y - this.ballBottom : // ball moves down
-                this.ballTop - segment.y; // ball moves up
-            if (vdist <= 0)
-                continue;
-            var dtime = vdist / Math.abs(vspeed);
-            var nextX = this.ballX + hspeed * dtime;
-            if (nextX > segment.x2 || nextX < segment.x1)
-                continue;
-            if (dtime < minHTime) {
-                minHIdx = i;
-                minHTime = dtime;
-            }
+        // special case : paddle line collision
+        if (this.state != 3 && sina > 0 && this.ballBottom < this.height) {
+            minType = 5;
+            minTime = (this.height - this.ballBottom) / vspeed; // minTime > 0
         }
-        // check all vertical segments
-        for (let i = 0; i < this.vp.length; ++i) {
-            let segment = this.vp[i];
-            var hdist = cosa > 0 ? 
-                segment.x - this.ballRight : // ball moves right
-                this.ballLeft - segment.x ; // ball moves left
-            if (hdist <= 0)
-                continue;
-            var dtime = hdist / Math.abs(hspeed);
-            var nextY = this.ballY + vspeed * dtime;
-            if (nextY > segment.y2 || nextY < segment.y1)
-                continue;
-            if (dtime < minVTime) {
-                minVIdx = i;
-                minVTime = dtime;
+        // bricks collisions
+        for (let i = 0; i < this.bricks.length; ++i) {
+            let [x1, x2, y1, y2, id, type, color] = this.bricks[i];
+            let vdist = sina > 0 ?
+                y1 - this.ballBottom : // ball moves down
+                this.ballTop - y2; // ball moves up
+            let hdist = cosa > 0 ?
+                x1 - this.ballRight : // ball moves right
+                this.ballLeft - x2; // ball moves left
+            if (type == 1) { // special case: game area
+                vdist = sina > 0 ? y2 - this.ballBottom : this.ballTop - y1;
+                hdist = cosa > 0 ? x2 - this.ballRight : this.ballLeft - x1;
             }
-        }
-        if (minHTime == Infinity && minVTime == Infinity)
-            return;
-        if (minHTime < minVTime) {
-            if (this.hp[minHIdx].type == 2) { // paddle line
-                if (this.state != 3) {
-                    this.eq.push({type: 5, time: this.time + minHTime}); // paddle bounce
+            if (vdist > 0) {
+                var vtime = vdist / Math.abs(vspeed);
+                var nextX = this.ballX + hspeed * vtime;
+                if (nextX >= x1 && nextX <= x2 && vtime < minTime) {
+                    minTime = vtime;
+                    minType = 3; // horizontal bounce
+                    minIdx = i;
                 }
-            } else { // top horizontal line
-                this.eq.push({type: 3, time: this.time + minHTime}); // horizontal bounce
-                this.sq.push({type: 3, time: this.time + minHTime, sound: 'bounce'});
+                if (id == 8) {
+                    console.log(`id ${id} vtime=${vtime.toFixed(4)} x1=${x1} x2=${x2} nx=${nextX.toFixed(2)} minTime=${minTime.toFixed(4)} hdist=${hdist.toFixed(2)}`);
+                }
             }
-        } else {
-            this.eq.push({type: 4, time: this.time + minVTime}); // vertical bounce
-            this.sq.push({type: 4, time: this.time + minVTime, sound: 'bounce'});
+            if (hdist > 0) {
+                var htime = hdist / Math.abs(hspeed);
+                var nextY = this.ballY + vspeed * htime;
+                if (nextY >= y1 && nextY <= y2 && htime < minTime) {
+                    minTime = htime;
+                    minType = 4; // vertical bounce
+                    minIdx = i;
+                }
+                if (id == 8) {
+                    console.log(`id ${id} htime=${htime.toFixed(4)} y1=${y1} y2=${y2} ny=${nextY.toFixed(2)} minTime=${minTime.toFixed(4)} vdist=${vdist.toFixed(2)}`);
+                }
+            }
+            // special case: corner bounce
+            if (vdist > 0 && hdist > 0) {
+                let dy = sina > 0 ? y1 - nextY : nextY - y2;
+                let dx = cosa > 0 ? x1 - nextX : nextX - x2;
+                if (dx > 0 && dy > 0) {
+                    if (dx < dy) {
+                        if (vtime < minTime) {
+                            minTime = vtime;
+                            minType = 3; // horizontal bounce
+                            minIdx = i;
+                        }
+                    } else {
+                        if (htime < minTime) {
+                            minTime = htime;
+                            minType = 4; // vertical bounce
+                            minIdx = i;
+                        }
+                    }
+                }
+                // let toTryHBounce = false, toTryVBounce = false;
+                // if (sina <= 0 && cosa > 0 && nextY > y2 && nextX < x1) { // up right
+                //     if (x1 - nextX <= nextY - y2)
+                //         toTryHBounce = true;
+                //     else
+                //         toTryVBounce = true;
+                // } else if (sina > 0 && cosa > 0 && nextY < y1 && nextX < x1) { // down right
+                //     if (x1 - nextX <= y1 - nextY)
+                //         toTryHBounce = true;
+                //     else
+                //         toTryVBounce = true;
+                // } else if (sina > 0 && cosa <= 0 && nextY < y1 && nextX > x2) { // down left
+                //     if (nextX - x2 <= y1 - nextY)
+                //         toTryHBounce = true;
+                //     else
+                //         toTryVBounce = true;
+                // } else if (sina <= 0 && cosa <= 0 && nextY > y2 && nextX > x2) { // down left
+                //     if (nextX - x2 <= nextY - y2)
+                //         toTryHBounce = true;
+                //     else
+                //         toTryVBounce = true;
+                // }
+                // if (toTryHBounce && vtime < minTime) {
+                //     minTime = vtime;
+                //     minType = 3; // horizontal bounce
+                //     minIdx = i;
+                // }
+                // if (toTryVBounce && htime < minTime) {
+                //     minTime = htime;
+                //     minType = 4; // vertical bounce
+                //     minIdx = i;
+                // }
+            }
+        }
+        // push event
+        if (minType != -1) {
+            console.log(`bounce queued x=${this.ballX.toFixed(2)} y=${this.ballY.toFixed(2)} dtime=${minTime.toFixed(2)} id=${minIdx >= 0 ? this.bricks[minIdx][4] : minIdx} angle=${this.angle.toFixed(4)}`);
+            var eventObject = {type: minType, time: this.time + minTime, param: minIdx};
+            this.eq.push(eventObject);
+            if (minType != 5) {
+                this.sq.push(eventObject); }
         }
     }
     processEvent(ev) {
-        console.log(ev);
         switch (ev.type) {
             case 1: // paddle left
                 this.paddleLeft -= 32;
@@ -166,18 +251,31 @@ class GameModel {
                 } else if (ev.type == 5) { // horizontal paddle bounce
                     if (this.ballX <= this.paddleRight && this.ballX >= this.paddleLeft) {
                         this.angle = - this.angle;
-                        this.sq.push({type: 5, time: this.time, sound: 'paddle'});
+                        this.sq.push({type: 5, time: this.time}); // paddle sound
                     } else {
                         // paddle misses the ball
                         var sina = Math.sin(this.angle);
                         var vspeed = (this.speed + this.speedExtra) * sina;
                         var gameEndTime = Math.round(this.time + this.footerHeight / vspeed);
-                        this.eq.push({type: 6, time: gameEndTime});
-                        this.sq.push({type: 6, time: gameEndTime, sound: 'gameOver'});
+                        let eventObject = {type: 6, time: gameEndTime};
+                        this.eq.push(eventObject);
+                        this.sq.push(eventObject); // gameOver sound
                         this.state = 3; // BALL MISSED
                     }
                 } else if (ev.type == 4) { // vertical bounce 
                     this.angle = Math.PI - this.angle;
+                }
+                let brickIdx = 'param' in ev ? ev.param : -1;
+                if (brickIdx > 0) { // brickIdx == 0 - game area
+                    let type = this.bricks[brickIdx][5];
+                    if (type == 3) {// silver
+                        this.bricks[brickIdx][5] = 2;
+                        this.bq.push(-this.bricks[brickIdx][4]); // change color
+                    } else if (type == 2) { // regular
+                        this.bq.push(this.bricks[brickIdx][4]);
+                        this.bricks.splice(brickIdx, 1);
+                    }
+                    // type == 4 gold - persistent
                 }
                 this.queueBounce();
                 break;
@@ -189,7 +287,7 @@ class GameModel {
                 this.eq.push({type: 7, time: this.time + this.scoreInterval}); 
                 break;
             case 8: // speed up
-                this.speedExtra += 0.1;
+                this.speedExtra += 0.05;
                 this.eq.push({type: 8, time: this.time + this.speedInterval}); 
                 break;
         }
@@ -252,7 +350,7 @@ class GameView {
         this.paddle.style.height = `${this.m.paddleHeight}px`;
         this.paddle.style.top = `${this.m.paddleTop}px`;
         // Initialize Audio
-        this.soundKeys = ['bounce', 'bounce2', 'paddle', 'gameOver', 'music'];
+        this.soundKeys = ['bounce', 'bounce2', 'gold', 'paddle', 'gameOver', 'music'];
         this.sounds = {};
         this.soundInitialized = false;
         // draw objects
@@ -277,12 +375,44 @@ class GameView {
         this.status.innerHTML = "Level 1";
         this.status.classList.remove('msg-err');
         this.status.classList.add('msg-ok');
+        // remove existing bricks
+        const elementsToRemove = document.querySelectorAll('.brick');
+        elementsToRemove.forEach(el => el.parentNode.removeChild(el));
+        // bricks
+        for (let i = 0; i < this.m.bricks.length; ++i) {
+            let [x1, x2, y1, y2, id, type, color] = this.m.bricks[i];
+            if (type == 1) continue; // game area
+            const newBrick = document.createElement('div');
+            newBrick.style.backgroundColor = `#${color.toString(16).padStart(6, '0')}`;
+            newBrick.style.top = `${y1 + 2}px`;
+            newBrick.style.left = `${x1 + 2}px`;
+            newBrick.style.width = `${x2 - x1 - 3}px`;
+            newBrick.style.height = `${y2 - y1 - 3}px`;
+            newBrick.id = `brick-${id}`;
+            newBrick.className = 'brick';
+            this.game.appendChild(newBrick);
+        }
     }
     endGame() {
         this.ball.style.visibility = 'hidden';
         this.status.innerHTML = "Game Over";
         this.status.classList.remove('msg-ok');
         this.status.classList.add('msg-err');
+    }
+    // id > 0 - remove brick, id < 0 - change color
+    removeBrick(id) {
+        let toDelete = true;
+        if (id < 0) { 
+            id = - id; 
+            toDelete = false;
+        }
+        const el = document.getElementById(`brick-${id}`);
+        if (el) {
+            if (toDelete)
+                el.parentNode.removeChild(el);
+            else
+                el.style.backgroundColor = '#333333';
+        }
     }
     playSound(sound) {
         console.log(`play ${sound} obj=${this.sounds[sound]}`)
@@ -371,24 +501,43 @@ class GameController {
         }
         var newTime = performance.now();
         this.m.timeStep(newTime - this.perfTime);
+        this.processSoundEvents();
+        this.processBricks();
+        this.perfTime = newTime;
+        this.v.render();
+        this.timer = requestAnimationFrame(this.step);
+    }
+    processSoundEvents() {
         for (let i = 0; i < this.m.sq.length; ++i) { // process sound events
             var soundEvent = this.m.sq[i];
             var delta = Math.round(soundEvent.time - this.m.time);
             if (delta > this.PLAN_SOUNDS_TIME)
                 continue;
             if (this.toPlaySounds) {
-                console.log(`plan to play ${soundEvent.sound} in ${delta} time`);
+                let type = 'param' in soundEvent && soundEvent.param >= 0 ? 
+                    this.m.bricks[soundEvent.param][5] : -1;
+                var sound = '';
+                switch (soundEvent.type) {
+                    case 3:
+                    case 4: sound = type == 2 ? 'bounce2' : type == 1 ? 'bounce' : 'gold'; break;
+                    case 5: sound = 'paddle'; break;
+                    case 6: sound = 'gameOver'; break;
+                }
+                console.log(`plan to play ${sound} in ${delta} time`);
                 if (delta <= 0) {
-                    this.v.playSound(soundEvent.sound);
+                    this.v.playSound(sound);
                 } else {
-                    setTimeout(() => { this.v.playSound(soundEvent.sound); }, delta);
+                    setTimeout(() => { this.v.playSound(sound); }, delta);
                 }
             }
             this.m.sq.splice(i, 1);
         }
-        this.perfTime = newTime;
-        this.v.render();
-        this.timer = requestAnimationFrame(this.step);
+    }
+    processBricks() {
+        for (let i = 0; i < this.m.bq.length; ++i) { // process removed bricks
+            this.v.removeBrick(this.m.bq[i]);
+            this.m.bq.splice(i, 1);
+        }
     }
     keyListener(e) {
         var key = e.keyCode;

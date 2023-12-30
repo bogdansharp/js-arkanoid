@@ -86,3 +86,8 @@
     float: right;
     cursor: pointer;
 }
+
+.main #game .brick {
+    position: absolute;
+    border: 1px black solid;
+}
