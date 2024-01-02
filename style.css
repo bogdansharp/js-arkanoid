@@ -38,7 +38,7 @@
     width: 1px;
     height: 1px;
     border-radius: 1px;
-    background-color: cornflowerblue;
+    background-color: darkolivegreen;
 }
 
 .msg-ok { color: green; }
@@ -90,4 +90,16 @@
 .main #game .brick {
     position: absolute;
     border: 1px black solid;
+}
+
+.main #mainstatus {
+    position: absolute;
+    text-align: center;
+    font-size: x-large;
+    font-weight: bold;
+    z-index: 4;
+    left: 0px;
+    width: 100%;
+    top: 40%;
+    /*display: none;*/
 }

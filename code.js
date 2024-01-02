@@ -3,12 +3,15 @@ class GameModel {
         const MIN_WIDTH = 128;
         const MIN_HEIGHT = 64;
         // states: 0 - init, 1 - active, 2 - pause, 3 - missed, 666 - game over
+        this.title = 'Bounce game';
+        this.statusTitle = '';
         this.state = 0; // INITIALIZATION
         this.time = 0;
         this.err = 0; // OK
         this.errMsg = ''; // OK
         this.score = 0;
         this.scoreInterval = 1000; // 1 score for speed 0.1 each 1s
+        this.SCORE_BRICK_DESTROY = 100;
         this.speedInterval = 20 * 1000; // speed up each 20s
         if (width < MIN_WIDTH || height < MIN_HEIGHT) {
             this.err = 1; // ERROR
@@ -18,58 +21,69 @@ class GameModel {
         this.width = width;
         this.footerHeight = 48;
         this.height = height - this.footerHeight;
+        // ball
+        this.ballRadius = 8;
+        this.ballDiam = this.ballRadius * 2;
         // paddle
         this.paddleHeight = 16;
         this.paddleHalf = 32;
         this.paddleWidth = this.paddleHalf * 2;
-        this.paddleX = this.width / 2;
         this.paddleTop = this.height;
+        this.paddleX = this.width / 2;
         this.paddleLeft = this.paddleX - this.paddleHalf;
         this.paddleRight = this.paddleX + this.paddleHalf;
-        // ball
-        this.speed = 0.1;
-        this.speedExtra = 0.0;
-        // angle = -1.0472 x=46.17 y=581.00
-        // bounce queued x=141.67 y=581.00 dtime=763.85 id=0 angle=4.1888
-        // bounce queued x=333.03 y=8.00 dtime=1449.74 id=0 angle=1.0472
-        this.angle = 1.0472; //Math.PI / 3.0;
-        this.ballRadius = 8;
-        this.ballDiam = this.ballRadius * 2;
-        this.ballX = 60; //this.width / 2;
-        this.ballY = 581; //this.height - this.ballRadius;
-        this.moveBall(0);
         // bricks
         this.bricks = []; // format: [x1, x2, y1, y2, id, type, color]
         this.bricks.push( // game area
             [0, this.width, 0, this.height + this.footerHeight, 0, 1, 0xdcdcdc]); 
         this.BRICK_WIDTH = 40;
         this.BRICK_HEIGHT = 20;
-        for (let i = 0, type = 2, id = 1,
-            columns = Math.floor(this.width / this.BRICK_WIDTH),
-            line1Top = this.BRICK_HEIGHT * 3,
-            line1Bottom = line1Top + this.BRICK_HEIGHT,
-            line2Top = this.BRICK_HEIGHT * 4,
-            line2Bottom = line2Top + this.BRICK_HEIGHT,
-            line3Top = this.BRICK_HEIGHT * 5,
-            line3Bottom = line3Top + this.BRICK_HEIGHT,
-            line4Top = this.BRICK_HEIGHT * 6,
-            line4Bottom = line4Top + this.BRICK_HEIGHT,
-            line5Top = this.BRICK_HEIGHT * 7,
-            line5Bottom = line5Top + this.BRICK_HEIGHT,
-            line6Top = this.BRICK_HEIGHT * 8,
-            line6Bottom = line6Top + this.BRICK_HEIGHT; 
-            i < columns; ++i) 
-        {
-            if (i == 7) continue;
-            let left = i * this.BRICK_WIDTH;
-            let right = left + this.BRICK_WIDTH;
-            this.bricks.push([left, right, line1Top, line1Bottom, id++, type, 0xff0000]); // red
-            this.bricks.push([left, right, line2Top, line2Bottom, id++, type, 0x00ff00]); // green
-            this.bricks.push([left, right, line3Top, line3Bottom, id++, type, 0x0000ff]); // blue
-            this.bricks.push([left, right, line4Top, line4Bottom, id++, type, 0xff0000]); // red
-            this.bricks.push([left, right, line5Top, line5Bottom, id++, 4, 0xFFD700]); // gold
-            this.bricks.push([left, right, line6Top, line6Bottom, id++, 3, 0xC0C0C0]); // silver
-        }
+        // levels
+        this.levels = [];
+        this.level = -1;
+    }
+    newGame() {
+        this.time = 0;
+        // paddle
+        this.paddleX = this.width / 2;
+        this.paddleLeft = this.paddleX - this.paddleHalf;
+        this.paddleRight = this.paddleX + this.paddleHalf;
+        // ball
+        this.speed = 0.1;
+        this.speedExtra = 0.0;
+        this.angle = Math.PI / 3.0;
+        this.ballX = this.width / 2;
+        this.ballY = this.height - this.ballRadius;
+        this.moveBall(0);
+
+        // bricks
+        // for (let i = 0, type = 2, id = 1,
+        //     columns = Math.floor(this.width / this.BRICK_WIDTH),
+        //     line1Top = this.BRICK_HEIGHT * 3,
+        //     line1Bottom = line1Top + this.BRICK_HEIGHT,
+        //     line2Top = this.BRICK_HEIGHT * 4,
+        //     line2Bottom = line2Top + this.BRICK_HEIGHT,
+        //     line3Top = this.BRICK_HEIGHT * 5,
+        //     line3Bottom = line3Top + this.BRICK_HEIGHT,
+        //     line4Top = this.BRICK_HEIGHT * 6,
+        //     line4Bottom = line4Top + this.BRICK_HEIGHT,
+        //     line5Top = this.BRICK_HEIGHT * 7,
+        //     line5Bottom = line5Top + this.BRICK_HEIGHT,
+        //     line6Top = this.BRICK_HEIGHT * 8,
+        //     line6Bottom = line6Top + this.BRICK_HEIGHT; 
+        //     i < columns; ++i) 
+        // {
+        //     if (i == 7) continue;
+        //     let left = i * this.BRICK_WIDTH;
+        //     let right = left + this.BRICK_WIDTH;
+        //     this.bricks.push([left, right, line1Top, line1Bottom, id++, type, 0xff0000]); // red
+        //     this.bricks.push([left, right, line2Top, line2Bottom, id++, type, 0x00ff00]); // green
+        //     this.bricks.push([left, right, line3Top, line3Bottom, id++, type, 0x0000ff]); // blue
+        //     this.bricks.push([left, right, line4Top, line4Bottom, id++, type, 0xff0000]); // red
+        //     this.bricks.push([left, right, line5Top, line5Bottom, id++, 4, 0xFFD700]); // gold
+        //     this.bricks.push([left, right, line6Top, line6Bottom, id++, 3, 0xC0C0C0]); // silver
+        // }
+
         // brick ids to remove (negative numbers - only change color to black)
         this.bq = [];
         // game evens queue
@@ -80,9 +94,52 @@ class GameModel {
         // sound effects queue
         this.sq = [];
         // start game
-        if (! this.err) {
-            this.state = 1; // ACTIVE
+        this.state = 1; // ACTIVE
+    }
+    async loadGameData(controller) {
+        return new Promise( async (resolve) => {
+            if (this.err) {
+                resolve(this.state);
+                return;
+            }
+            try {
+                const response = await fetch('game.json');
+                const data = await response.json();
+                if (data && ('title' in data))
+                    this.title = data.title;
+                if (data && ('levels' in data))
+                    this.levels = data.levels;
+            } catch (error) {
+                this.err = 2; // ERROR
+                this.errMsg = 'Error loading game data:' + error;
+            } finally {
+                resolve(controller);
+            }
+        });
+    }
+    loadLevel(level) {
+        console.log(`loadLevel ${level}`);
+        if (level >= this.levels.length)
+            return;
+        this.bricks.splice(1, this.bricks.length - 1);
+        this.level = level;
+        if (level == 0)
+            this.score = 0;
+        this.statusTitle = this.levels[level].title;
+        let id = 1;
+        for (let i = 0; i < this.levels[level].bricks.length; ++i) {
+            let [ypos, xpos, type, color, count] = this.levels[level].bricks[i];
+            while (count-- > 0) {
+                let left = xpos * this.BRICK_WIDTH;
+                let right = left + this.BRICK_WIDTH;
+                if (right > this.width) break;
+                let top = this.BRICK_HEIGHT * ypos;
+                let bottom = top + this.BRICK_HEIGHT;
+                this.bricks.push([left, right, top, bottom, id++, type, color]);
+                ++xpos;
+            }
         }
+        this.newGame();
     }
     movePaddleLeft(delta) {
         this.eq.push({type: 1, time: this.time + delta});
@@ -131,9 +188,9 @@ class GameModel {
                     minType = 3; // horizontal bounce
                     minIdx = i;
                 }
-                if (id == 8) {
-                    console.log(`id ${id} vtime=${vtime.toFixed(4)} x1=${x1} x2=${x2} nx=${nextX.toFixed(2)} minTime=${minTime.toFixed(4)} hdist=${hdist.toFixed(2)}`);
-                }
+                // if (id == 8) {
+                //     console.log(`id ${id} vtime=${vtime.toFixed(4)} x1=${x1} x2=${x2} nx=${nextX.toFixed(2)} minTime=${minTime.toFixed(4)} hdist=${hdist.toFixed(2)}`);
+                // }
             }
             if (hdist > 0) {
                 var htime = hdist / Math.abs(hspeed);
@@ -143,9 +200,9 @@ class GameModel {
                     minType = 4; // vertical bounce
                     minIdx = i;
                 }
-                if (id == 8) {
-                    console.log(`id ${id} htime=${htime.toFixed(4)} y1=${y1} y2=${y2} ny=${nextY.toFixed(2)} minTime=${minTime.toFixed(4)} vdist=${vdist.toFixed(2)}`);
-                }
+                // if (id == 8) {
+                //     console.log(`id ${id} htime=${htime.toFixed(4)} y1=${y1} y2=${y2} ny=${nextY.toFixed(2)} minTime=${minTime.toFixed(4)} vdist=${vdist.toFixed(2)}`);
+                // }
             }
             // special case: corner bounce
             if (vdist > 0 && hdist > 0) {
@@ -274,13 +331,16 @@ class GameModel {
                     } else if (type == 2) { // regular
                         this.bq.push(this.bricks[brickIdx][4]);
                         this.bricks.splice(brickIdx, 1);
+                        this.score += this.SCORE_BRICK_DESTROY;
+                        this.checkForVictory();
                     }
                     // type == 4 gold - persistent
                 }
                 this.queueBounce();
                 break;
             case 6: // game over
-                this.state = 666; // GAME LOST
+                this.state = 6; // GAME LOST
+                this.statusTitle = 'Game Over!';
                 break;
             case 7: // score for time
                 this.score += Math.round(this.speed * 10);
@@ -291,6 +351,14 @@ class GameModel {
                 this.eq.push({type: 8, time: this.time + this.speedInterval}); 
                 break;
         }
+    }
+    checkForVictory() {
+        for (let i = 0; i < this.bricks.length; ++i) 
+            if (this.bricks[i][5] == 2) // type
+                return;
+        this.statusTitle = 'Victory!';
+        this.state = 7;
+        this.sq.push({type: 7, time: this.time}); // Victory sound
     }
     moveBall(delta) {
         this.ballX += delta * this.speed * Math.cos(this.angle);
@@ -325,19 +393,23 @@ class GameModel {
 }
 
 class GameView {
-    constructor(model, width, height) {
+    constructor(model) {
         // Model
         this.m = model;
         // game area
         this.game = document.getElementById("game");
-        this.game.style.width = `${width}px`;
-        this.game.style.height = `${height}px`;
+        this.game.style.width = `${this.m.width}px`;
+        this.game.style.height = `${this.m.height + this.m.footerHeight}px`;
         // Info panel
         this.info = document.getElementById("info");
         this.info.style.bottom = '10px';
         this.info.style.top = 'auto';
         this.scoreval = document.getElementById("scoreval");
         this.status = document.getElementById("status");
+        // Status Title
+        this.MAIN_STATUS_TIMEOUT = 3000;
+        this.mainstatus = document.getElementById("mainstatus");
+        document.title = this.m.title;
         // ball
         this.ball = document.getElementById("ball");
         this.ball.style.width = `${this.m.ballDiam}px`;
@@ -350,7 +422,7 @@ class GameView {
         this.paddle.style.height = `${this.m.paddleHeight}px`;
         this.paddle.style.top = `${this.m.paddleTop}px`;
         // Initialize Audio
-        this.soundKeys = ['bounce', 'bounce2', 'gold', 'paddle', 'gameOver', 'music'];
+        this.soundKeys = ['bounce', 'bounce2', 'gold', 'paddle', 'gameOver', 'win', 'music'];
         this.sounds = {};
         this.soundInitialized = false;
         // draw objects
@@ -370,14 +442,26 @@ class GameView {
         this.paddle.style.left = `${Math.round(this.m.paddleLeft)}px`;
         this.scoreval.innerHTML = this.m.score;
     }
-    newGame() {
-        this.ball.style.visibility = 'visible';
-        this.status.innerHTML = "Level 1";
-        this.status.classList.remove('msg-err');
-        this.status.classList.add('msg-ok');
+    async showMainStatus() {
         // remove existing bricks
         const elementsToRemove = document.querySelectorAll('.brick');
         elementsToRemove.forEach(el => el.parentNode.removeChild(el));
+        // hide Ball
+        this.ball.style.visibility = 'hidden';
+        // Text elements
+        this.status.style.display = 'none';
+        this.mainstatus.innerHTML = this.m.statusTitle;
+        this.mainstatus.classList.remove('msg-err');
+        this.mainstatus.classList.add('msg-ok');
+        this.mainstatus.style.display = 'block';
+        // sleep
+        return new Promise( async (resolve) => 
+            setTimeout(resolve, this.MAIN_STATUS_TIMEOUT) );
+    }
+    newGame() {
+        this.mainstatus.style.display = 'none';
+        // show Ball
+        this.ball.style.visibility = 'visible';
         // bricks
         for (let i = 0; i < this.m.bricks.length; ++i) {
             let [x1, x2, y1, y2, id, type, color] = this.m.bricks[i];
@@ -392,12 +476,25 @@ class GameView {
             newBrick.className = 'brick';
             this.game.appendChild(newBrick);
         }
+        // Text elements
+        this.status.innerHTML = this.m.statusTitle;
+        this.status.classList.remove('msg-err');
+        this.status.classList.add('msg-ok');
+        this.status.style.display = 'inline';
     }
     endGame() {
         this.ball.style.visibility = 'hidden';
-        this.status.innerHTML = "Game Over";
-        this.status.classList.remove('msg-ok');
-        this.status.classList.add('msg-err');
+        this.status.style.display = 'none';
+        this.status.innerHTML = this.m.statusTitle;
+        this.mainstatus.innerHTML = this.m.statusTitle;
+        this.mainstatus.classList.remove('msg-ok');
+        this.mainstatus.classList.remove('msg-err');
+        if (this.m.state == 6) { // Game Over!
+            this.mainstatus.classList.add('msg-err');
+        } else { // lose
+            this.mainstatus.classList.add('msg-ok');
+        }
+        this.mainstatus.style.display = 'block';
     }
     // id > 0 - remove brick, id < 0 - change color
     removeBrick(id) {
@@ -415,9 +512,11 @@ class GameView {
         }
     }
     playSound(sound) {
-        console.log(`play ${sound} obj=${this.sounds[sound]}`)
-        if (sound in this.sounds)
+        console.log(`play ${sound} ended=${this.sounds[sound].ended}`)
+        if (sound in this.sounds) {
+            this.sounds[sound].currentTime = 0;
             this.sounds[sound].play();
+        }
     }
     playMusic(on) {
         if ('music' in this.sounds) {
@@ -441,32 +540,43 @@ class GameView {
 }
 
 class GameController {
-    constructor(model, view) {
+    constructor() {
         // Model, View
-        this.m = model;
-        this.v = view;
-        var rect = this.v.game.getBoundingClientRect();
-        this.gameAreaShift = rect.left;
-        // Key handlers
-        this.keyListener = this.keyListener.bind(this);
-        document.addEventListener('keydown', this.keyListener, false);
-        // mouse
-        this.isDrag = false;
-        this.mouseDown = this.mouseDown.bind(this);
-        this.mouseMove = this.mouseMove.bind(this);
-        this.mouseUp = this.mouseUp.bind(this);
-        this.v.game.addEventListener('mousedown', this.mouseDown, false);
-        this.v.game.addEventListener('mousemove', this.mouseMove, false);
-        this.v.game.addEventListener('mouseup', this.mouseUp, false);
-        // touch
-        this.v.game.addEventListener('touchstart', this.mouseDown, false);
-        this.v.game.addEventListener('touchmove', this.mouseMove, false);
-        this.v.game.addEventListener('touchend', this.mouseUp, false);
-        // Game steps
-        this.step = this.step.bind(this);
-        this.timer = 0;
-        this.perfTime = performance.now();
-        this.timer = requestAnimationFrame(this.step);
+        this.m = null;
+        this.v = null;
+        const BORDER_WIDTH = 10;
+        var width = innerWidth - BORDER_WIDTH * 2;
+        var height = innerHeight - BORDER_WIDTH * 2;
+        this.m = new GameModel(width, height);
+        this.m.loadGameData(this).then( that => {
+            console.log(that);
+            if (that.m.err) {
+                if (that.m.state != 1)
+                    throw new Error('ERROR:' + that.m.errMsg);
+                else
+                    console.log('ERROR:' + that.m.errMsg);
+            }
+            that.v = new GameView(that.m);
+            var rect = that.v.game.getBoundingClientRect();
+            that.gameAreaShift = rect.left;
+            // Key handlers
+            that.keyListener = that.keyListener.bind(that);
+            document.addEventListener('keydown', that.keyListener, false);
+            // mouse
+            that.isDrag = false;
+            that.mouseDown = that.mouseDown.bind(that);
+            that.mouseMove = that.mouseMove.bind(that);
+            that.mouseUp = that.mouseUp.bind(that);
+            that.v.game.addEventListener('mousedown', that.mouseDown, false);
+            that.v.game.addEventListener('mousemove', that.mouseMove, false);
+            that.v.game.addEventListener('mouseup', that.mouseUp, false);
+            // touch
+            that.v.game.addEventListener('touchstart', that.mouseDown, false);
+            that.v.game.addEventListener('touchmove', that.mouseMove, false);
+            that.v.game.addEventListener('touchend', that.mouseUp, false);
+            // New Game
+            that.startNewGame(0);
+        });
         // Settings
         this.toPlaySounds = false;
         this.toPlayMusic = false;
@@ -488,15 +598,37 @@ class GameController {
         this.musicCheck.checked = this.toPlayMusic;
         this.soundCheck.addEventListener('click', this.setSound.bind(this), false);
         this.musicCheck.addEventListener('click', this.setMusic.bind(this), false);
+        // Game steps
+        this.step = this.step.bind(this);
     }
     kill() {
         document.removeEventListener('keydown', this.keyListener, false);
         if (this.timer) {
             window.cancelAnimationFrame(this.timer); }
     }
+    startNewGame(level) {
+        if (this.m.levels.length > 0) { // Campain
+            this.m.loadLevel(level);
+            this.v.showMainStatus().then((result) => {
+                this.v.newGame();
+                this.perfTime = performance.now();
+                this.timer = requestAnimationFrame(this.step);
+            });
+        } else { // Else - Free Bounce
+            this.m.newGame();
+            this.v.newGame();
+        }
+    }
     step() {
-        if (this.m.state == 666) { // Game over
+        if (this.m.state == 6) { // Game over
             this.v.endGame();
+            return;
+        } else if (this.m.state == 7) { // Level complete
+            if (this.m.level + 1 < this.m.levels.length) {
+                this.startNewGame(this.m.level + 1);
+            } else {
+                this.v.endGame(); // Victory
+            }
             return;
         }
         var newTime = performance.now();
@@ -522,6 +654,7 @@ class GameController {
                     case 4: sound = type == 2 ? 'bounce2' : type == 1 ? 'bounce' : 'gold'; break;
                     case 5: sound = 'paddle'; break;
                     case 6: sound = 'gameOver'; break;
+                    case 7: sound = 'win'; break;
                 }
                 console.log(`plan to play ${sound} in ${delta} time`);
                 if (delta <= 0) {
@@ -599,10 +732,9 @@ class GameController {
         }
     }
     newGameClick(e) {
-        this.m = new GameModel(this.m.width, this.m.height + this.m.footerHeight);
-        this.v.m = this.m;
-        this.v.newGame();
-        this.showControls();
+        this.active = true;
+        this.controls.hidden = this.active;
+        this.startNewGame(0);
     }
 }
 
@@ -612,18 +744,7 @@ class GameApp {
             GameApp.instance.kill();
         }
         GameApp.instance = this;
-        // New Game
-        const BORDER_WIDTH = 10;
-        var width = innerWidth - BORDER_WIDTH * 2;
-        var height = innerHeight - BORDER_WIDTH * 2;
-        var model = new GameModel(width, height);
-        var view = null;
-        this.c = null;
-        if (model.err) {
-            throw new Error('ERROR:' + model.errMsg);
-        }
-        view = new GameView(model, width, height);
-        this.c = new GameController(model, view);
+        this.c = new GameController();
     }
     kill() {
         if (this.c) {
