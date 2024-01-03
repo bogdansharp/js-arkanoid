@@ -2,6 +2,7 @@ class GameModel {
     constructor(width, height) {
         const MIN_WIDTH = 128;
         const MIN_HEIGHT = 64;
+        this.DEBUG = false;
         // states: 0 - init, 1 - active, 2 - pause, 3 - missed, 666 - game over
         this.title = 'Bounce game';
         this.statusTitle = '';
@@ -10,6 +11,7 @@ class GameModel {
         this.err = 0; // OK
         this.errMsg = ''; // OK
         this.score = 0;
+        this.ballOnPaddle = true;
         this.scoreInterval = 1000; // 1 score for speed 0.1 each 1s
         this.SCORE_BRICK_DESTROY = 100;
         this.speedInterval = 20 * 1000; // speed up each 20s
@@ -47,6 +49,7 @@ class GameModel {
     }
     newGame() {
         this.time = 0;
+        this.ballOnPaddle = true;
         // paddle
         this.paddleX = this.width / 2;
         this.paddleLeft = this.paddleX - this.paddleHalf;
@@ -62,18 +65,15 @@ class GameModel {
         this.bq = [];
         // game evens queue
         this.eq = [];
-        this.eq.push({type: 3, time: this.time}); // horizontal bounce
-        this.eq.push({type: 7, time: this.time + this.scoreInterval}); // score for time
-        this.eq.push({type: 8, time: this.time + this.speedInterval});  // speed up 
         // sound effects queue
         this.sq = [];
         // start game
         this.state = 1; // ACTIVE
     }
-    async loadGameData(controller) {
+    async loadGameData() {
         return new Promise( async (resolve) => {
             if (this.err) {
-                resolve(this.state);
+                resolve();
                 return;
             }
             try {
@@ -87,12 +87,13 @@ class GameModel {
                 this.err = 2; // ERROR
                 this.errMsg = 'Error loading game data:' + error;
             } finally {
-                resolve(controller);
+                resolve();
             }
         });
     }
     loadLevel(level) {
-        console.log(`loadLevel ${level}`);
+        if (this.DEBUG)
+            console.log(`loadLevel ${level}`);
         if (level >= this.levels.length)
             return;
         this.bricks.splice(1, this.bricks.length - 1);
@@ -123,6 +124,10 @@ class GameModel {
     }
     movePaddlePos(delta, pos) {
         this.eq.push({type: 9, time: this.time + delta, param: pos});
+    }
+    releaseBall(delta = 0) {
+        if (this.ballOnPaddle)
+            this.eq.push({type: 10, time: this.time + delta});
     }
     queueBounce() {
         this.speed += this.speedExtra;
@@ -195,7 +200,8 @@ class GameModel {
         }
         // push event
         if (minType != -1) {
-            console.log(`bounce queued x=${this.ballX.toFixed(2)} y=${this.ballY.toFixed(2)} dtime=${minTime.toFixed(2)} id=${minIdx >= 0 ? this.bricks[minIdx][4] : minIdx} angle=${this.angle.toFixed(4)}`);
+            if (this.DEBUG)
+                console.log(`bounce queued x=${this.ballX.toFixed(2)} y=${this.ballY.toFixed(2)} dtime=${minTime.toFixed(2)} id=${minIdx >= 0 ? this.bricks[minIdx][4] : minIdx} angle=${this.angle.toFixed(4)}`);
             var eventObject = {type: minType, time: this.time + minTime, param: minIdx};
             this.eq.push(eventObject);
             if (minType != 5) {
@@ -204,12 +210,22 @@ class GameModel {
     }
     processEvent(ev) {
         switch (ev.type) {
+            case 10: // release ball
+                this.eq.push({type: 3, time: this.time}); // horizontal bounce
+                this.eq.push({type: 7, time: this.time + this.scoreInterval}); // score for time
+                this.eq.push({type: 8, time: this.time + this.speedInterval});  // speed up 
+                this.ballOnPaddle = false;
+                break;
             case 1: // paddle left
                 this.paddleLeft -= 32;
                 if (this.paddleLeft < 0) {
                     this.paddleLeft = 0; }
                 this.paddleX = this.paddleLeft + this.paddleHalf;
                 this.paddleRight = this.paddleLeft + this.paddleWidth;
+                if (this.ballOnPaddle) {
+                    this.ballX = this.paddleX;
+                    this.moveBall(0);
+                }
                 break;
             case 2: // paddle right
                 this.paddleRight += 32;
@@ -217,6 +233,10 @@ class GameModel {
                     this.paddleRight = this.width; }
                 this.paddleLeft = this.paddleRight - this.paddleWidth;
                 this.paddleX = this.paddleLeft + this.paddleHalf;
+                if (this.ballOnPaddle) {
+                    this.ballX = this.paddleX;
+                    this.moveBall(0);
+                }
                 break;
             case 9: // paddle move to pos (mouse or touch)
                 var newX = ev.param;
@@ -234,6 +254,10 @@ class GameModel {
                 this.paddleX = newX;
                 this.paddleLeft = newX - this.paddleHalf;
                 this.paddleRight = newX + this.paddleHalf;
+                if (this.ballOnPaddle) {
+                    this.ballX = this.paddleX;
+                    this.moveBall(0);
+                }
                 break;
             case 3: // horizontal bounce
             case 5: // horizontal paddle bounce
@@ -295,7 +319,8 @@ class GameModel {
                 break;
             case 7: // score for time
                 this.moveBall(ev.time - this.time);
-                this.score += Math.round(this.speed * 10);
+                if (! this.ballOnPaddle)
+                    this.score += Math.round(this.speed * 10);
                 this.eq.push({type: 7, time: this.time + this.scoreInterval}); 
                 break;
             case 8: // speed up
@@ -307,15 +332,17 @@ class GameModel {
     }
     checkForVictory() {
         for (let i = 0; i < this.bricks.length; ++i) 
-            if (this.bricks[i][5] == 2) // type
+            if (this.bricks[i][5] == 2 || this.bricks[i][5] == 3) // type
                 return;
         this.statusTitle = 'Victory!';
         this.state = 7;
         this.sq.push({type: 7, time: this.time}); // Victory sound
     }
     moveBall(delta) {
-        this.ballX += delta * this.speed * Math.cos(this.angle);
-        this.ballY += delta * this.speed * Math.sin(this.angle);
+        if (! this.ballOnPaddle) {
+            this.ballX += delta * this.speed * Math.cos(this.angle);
+            this.ballY += delta * this.speed * Math.sin(this.angle);
+        }
         this.ballTop = this.ballY - this.ballRadius;
         this.ballBottom = this.ballY + this.ballRadius;
         this.ballLeft = this.ballX - this.ballRadius;
@@ -323,7 +350,6 @@ class GameModel {
         this.time += delta;
     }
     timeStep(increment) {
-        //console.log(`timeStep time=${this.time.toFixed(4)} increment=${increment.toFixed(4)}`)
         var endTime = this.time + increment;
         while (true) {
             var minIdx = -1; 
@@ -347,6 +373,7 @@ class GameModel {
 
 class GameView {
     constructor(model) {
+        this.DEBUG = false;
         // Model
         this.m = model;
         // game area
@@ -466,7 +493,8 @@ class GameView {
         }
     }
     playSound(sound) {
-        console.log(`play ${sound} ended=${this.sounds[sound].ended}`)
+        if (this.DEBUG)
+            console.log(`play ${sound} ended=${this.sounds[sound].ended}`);
         if (sound in this.sounds) {
             this.sounds[sound].currentTime = 0;
             this.sounds[sound].play();
@@ -474,7 +502,8 @@ class GameView {
     }
     playMusic(on) {
         if ('music' in this.sounds) {
-            console.log(`obj=${this.sounds['music']} on=${on}`);
+            if (this.DEBUG)
+                console.log(`obj=${this.sounds['music']} on=${on}`);
             var music = this.sounds['music'];
             if (on) {
                 music.loop = true;
@@ -495,6 +524,7 @@ class GameView {
 
 class GameController {
     constructor() {
+        this.DEBUG = false;
         // Model, View
         this.m = null;
         this.v = null;
@@ -502,34 +532,36 @@ class GameController {
         var width = innerWidth - BORDER_WIDTH * 2;
         var height = innerHeight - BORDER_WIDTH * 2;
         this.m = new GameModel(width, height);
-        this.m.loadGameData(this).then( that => {
-            console.log(that);
-            if (that.m.err) {
-                if (that.m.state != 1)
-                    throw new Error('ERROR:' + that.m.errMsg);
+        this.m.loadGameData().then( result => {
+            if (this.m.err) {
+                if (this.m.state != 1)
+                    throw new Error('ERROR:' + this.m.errMsg);
                 else
-                    console.log('ERROR:' + that.m.errMsg);
+                    console.log('ERROR:' + this.m.errMsg);
             }
-            that.v = new GameView(that.m);
-            var rect = that.v.game.getBoundingClientRect();
-            that.gameAreaShift = rect.left;
+            this.v = new GameView(this.m);
+            var rect = this.v.game.getBoundingClientRect();
+            this.gameAreaShift = rect.left;
             // Key handlers
-            that.keyListener = that.keyListener.bind(that);
-            document.addEventListener('keydown', that.keyListener, false);
+            this.keyListener = this.keyListener.bind(this);
+            document.addEventListener('keydown', this.keyListener, false);
             // mouse
-            that.isDrag = false;
-            that.mouseDown = that.mouseDown.bind(that);
-            that.mouseMove = that.mouseMove.bind(that);
-            that.mouseUp = that.mouseUp.bind(that);
-            that.v.game.addEventListener('mousedown', that.mouseDown, false);
-            that.v.game.addEventListener('mousemove', that.mouseMove, false);
-            that.v.game.addEventListener('mouseup', that.mouseUp, false);
+            this.isDrag = false;
+            this.mouseDown = this.mouseDown.bind(this);
+            this.mouseMove = this.mouseMove.bind(this);
+            this.mouseUp = this.mouseUp.bind(this);
+            this.gameAreaClick = this.gameAreaClick.bind(this);
+            this.v.game.addEventListener('mousedown', this.mouseDown, false);
+            this.v.game.addEventListener('mousemove', this.mouseMove, false);
+            this.v.game.addEventListener('mouseup', this.mouseUp, false);
             // touch
-            that.v.game.addEventListener('touchstart', that.mouseDown, false);
-            that.v.game.addEventListener('touchmove', that.mouseMove, false);
-            that.v.game.addEventListener('touchend', that.mouseUp, false);
+            this.v.game.addEventListener('touchstart', this.mouseDown, false);
+            this.v.game.addEventListener('touchmove', this.mouseMove, false);
+            this.v.game.addEventListener('touchend', this.mouseUp, false);
+            // click to release ball
+            this.v.game.addEventListener('click', this.gameAreaClick, false);
             // New Game
-            that.startNewGame(0);
+            this.startNewGame(0);
         });
         // Settings
         this.toPlaySounds = false;
@@ -610,7 +642,8 @@ class GameController {
                     case 6: sound = 'gameOver'; break;
                     case 7: sound = 'win'; break;
                 }
-                console.log(`plan to play ${sound} in ${delta} time`);
+                if (this.DEBUG)
+                    console.log(`plan to play ${sound} in ${delta} time`);
                 if (delta <= 0) {
                     this.v.playSound(sound);
                 } else {
@@ -637,6 +670,10 @@ class GameController {
             this.showControls();
         }
     }
+    gameAreaClick(e) {
+        if (this.m.state == 1 && this.m.ballOnPaddle) {
+            this.m.releaseBall(); }
+    }
     mouseDown(e) {
         this.isDrag = true;
         this.v.game.style.cursor = 'pointer';
@@ -652,7 +689,6 @@ class GameController {
             e.preventDefault();
             var delta = Math.round(performance.now() - this.perfTime);
             var posX = e.clientX || e.targetTouches[0].pageX;
-            //console.log(`posx= ${posX}`);
             this.m.movePaddlePos(delta, posX - this.gameAreaShift);
         }
     }
@@ -663,7 +699,8 @@ class GameController {
         {
             this.v.initSound();
             this.v.soundInitialized = true;
-            console.log('sound initialized');
+            if (this.DEBUG)
+                console.log('sound initialized');
         }
     }
     setMusic(e) {
