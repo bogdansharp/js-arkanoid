@@ -203,7 +203,6 @@ class GameModel {
         }
     }
     processEvent(ev) {
-        console.log(`EVENT ${ev.type} ${ev.time} ${ev.param}`);
         switch (ev.type) {
             case 1: // paddle left
                 this.paddleLeft -= 32;
@@ -239,7 +238,7 @@ class GameModel {
             case 3: // horizontal bounce
             case 5: // horizontal paddle bounce
             case 4: // vertical bounce
-                this.moveBall(ev.time - this.time)
+                this.moveBall(ev.time - this.time);
                 if (ev.type == 3) { // horizontal bounce
                     this.angle = - this.angle;
                 } else if (ev.type == 5) { // horizontal paddle bounce
@@ -295,10 +294,12 @@ class GameModel {
                 this.statusTitle = 'Game Over!';
                 break;
             case 7: // score for time
+                this.moveBall(ev.time - this.time);
                 this.score += Math.round(this.speed * 10);
                 this.eq.push({type: 7, time: this.time + this.scoreInterval}); 
                 break;
             case 8: // speed up
+                this.moveBall(ev.time - this.time);
                 this.speedExtra += 0.05;
                 this.eq.push({type: 8, time: this.time + this.speedInterval}); 
                 break;
@@ -322,7 +323,7 @@ class GameModel {
         this.time += delta;
     }
     timeStep(increment) {
-        //console.log(`model step time = ${this.time}`)
+        //console.log(`timeStep time=${this.time.toFixed(4)} increment=${increment.toFixed(4)}`)
         var endTime = this.time + increment;
         while (true) {
             var minIdx = -1; 
