@@ -58,35 +58,6 @@ class GameModel {
         this.ballX = this.width / 2;
         this.ballY = this.height - this.ballRadius;
         this.moveBall(0);
-
-        // bricks
-        // for (let i = 0, type = 2, id = 1,
-        //     columns = Math.floor(this.width / this.BRICK_WIDTH),
-        //     line1Top = this.BRICK_HEIGHT * 3,
-        //     line1Bottom = line1Top + this.BRICK_HEIGHT,
-        //     line2Top = this.BRICK_HEIGHT * 4,
-        //     line2Bottom = line2Top + this.BRICK_HEIGHT,
-        //     line3Top = this.BRICK_HEIGHT * 5,
-        //     line3Bottom = line3Top + this.BRICK_HEIGHT,
-        //     line4Top = this.BRICK_HEIGHT * 6,
-        //     line4Bottom = line4Top + this.BRICK_HEIGHT,
-        //     line5Top = this.BRICK_HEIGHT * 7,
-        //     line5Bottom = line5Top + this.BRICK_HEIGHT,
-        //     line6Top = this.BRICK_HEIGHT * 8,
-        //     line6Bottom = line6Top + this.BRICK_HEIGHT; 
-        //     i < columns; ++i) 
-        // {
-        //     if (i == 7) continue;
-        //     let left = i * this.BRICK_WIDTH;
-        //     let right = left + this.BRICK_WIDTH;
-        //     this.bricks.push([left, right, line1Top, line1Bottom, id++, type, 0xff0000]); // red
-        //     this.bricks.push([left, right, line2Top, line2Bottom, id++, type, 0x00ff00]); // green
-        //     this.bricks.push([left, right, line3Top, line3Bottom, id++, type, 0x0000ff]); // blue
-        //     this.bricks.push([left, right, line4Top, line4Bottom, id++, type, 0xff0000]); // red
-        //     this.bricks.push([left, right, line5Top, line5Bottom, id++, 4, 0xFFD700]); // gold
-        //     this.bricks.push([left, right, line6Top, line6Bottom, id++, 3, 0xC0C0C0]); // silver
-        // }
-
         // brick ids to remove (negative numbers - only change color to black)
         this.bq = [];
         // game evens queue
@@ -158,8 +129,6 @@ class GameModel {
         this.speedExtra = 0;
         if (this.angle > Math.PI) 
             this.angle -= Math.PI + Math.PI;
-        if (Math.abs(this.angle) < 0.001) 
-            this.angle += 0.01
         var sina = Math.sin(this.angle);
         var cosa = Math.cos(this.angle);
         var minTime = Infinity;
@@ -193,9 +162,6 @@ class GameModel {
                     minType = 3; // horizontal bounce
                     minIdx = i;
                 }
-                // if (id == 8) {
-                //     console.log(`id ${id} vtime=${vtime.toFixed(4)} x1=${x1} x2=${x2} nx=${nextX.toFixed(2)} minTime=${minTime.toFixed(4)} hdist=${hdist.toFixed(2)}`);
-                // }
             }
             if (hdist > 0) {
                 var htime = hdist / Math.abs(hspeed);
@@ -205,9 +171,6 @@ class GameModel {
                     minType = 4; // vertical bounce
                     minIdx = i;
                 }
-                // if (id == 8) {
-                //     console.log(`id ${id} htime=${htime.toFixed(4)} y1=${y1} y2=${y2} ny=${nextY.toFixed(2)} minTime=${minTime.toFixed(4)} vdist=${vdist.toFixed(2)}`);
-                // }
             }
             // special case: corner bounce
             if (vdist > 0 && hdist > 0) {
@@ -228,38 +191,6 @@ class GameModel {
                         }
                     }
                 }
-                // let toTryHBounce = false, toTryVBounce = false;
-                // if (sina <= 0 && cosa > 0 && nextY > y2 && nextX < x1) { // up right
-                //     if (x1 - nextX <= nextY - y2)
-                //         toTryHBounce = true;
-                //     else
-                //         toTryVBounce = true;
-                // } else if (sina > 0 && cosa > 0 && nextY < y1 && nextX < x1) { // down right
-                //     if (x1 - nextX <= y1 - nextY)
-                //         toTryHBounce = true;
-                //     else
-                //         toTryVBounce = true;
-                // } else if (sina > 0 && cosa <= 0 && nextY < y1 && nextX > x2) { // down left
-                //     if (nextX - x2 <= y1 - nextY)
-                //         toTryHBounce = true;
-                //     else
-                //         toTryVBounce = true;
-                // } else if (sina <= 0 && cosa <= 0 && nextY > y2 && nextX > x2) { // down left
-                //     if (nextX - x2 <= nextY - y2)
-                //         toTryHBounce = true;
-                //     else
-                //         toTryVBounce = true;
-                // }
-                // if (toTryHBounce && vtime < minTime) {
-                //     minTime = vtime;
-                //     minType = 3; // horizontal bounce
-                //     minIdx = i;
-                // }
-                // if (toTryVBounce && htime < minTime) {
-                //     minTime = htime;
-                //     minType = 4; // vertical bounce
-                //     minIdx = i;
-                // }
             }
         }
         // push event
@@ -272,6 +203,7 @@ class GameModel {
         }
     }
     processEvent(ev) {
+        console.log(`EVENT ${ev.type} ${ev.time} ${ev.param}`);
         switch (ev.type) {
             case 1: // paddle left
                 this.paddleLeft -= 32;
@@ -314,22 +246,16 @@ class GameModel {
                     if (this.ballX <= this.paddleRight && this.ballX >= this.paddleLeft) {
                         let paddleEight = this.paddleHalf * 0.25;
                         if (this.ballX <= this.paddleLeft + paddleEight) {
-                            console.log('E1');
                             this.angle = - this.angle - this.paddleAngle3;
                         } else if (this.ballX <= this.paddleLeft + paddleEight + paddleEight) {
-                            console.log('E2');
                             this.angle = - this.angle - this.paddleAngle2;
                         } else if (this.ballX <= this.paddleLeft + paddleEight + paddleEight + paddleEight) {
-                            console.log('E3');
                             this.angle = - this.angle - this.paddleAngle1;
                         } else if (this.ballX >= this.paddleRight - paddleEight) {
-                            console.log('E8');
                             this.angle = - this.angle + this.paddleAngle3;
                         } else if (this.ballX >= this.paddleRight - paddleEight - paddleEight) {
-                            console.log('E7');
                             this.angle = - this.angle + this.paddleAngle2;
                         } else if (this.ballX >= this.paddleRight - paddleEight - paddleEight - paddleEight) {
-                            console.log('E6');
                             this.angle = - this.angle + this.paddleAngle1;
                         } else {
                             this.angle = - this.angle;
