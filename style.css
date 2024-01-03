@@ -31,6 +31,8 @@
     width: 1px;
     height: 1px;
     background-color: coral;
+    border-top-left-radius: 5px;
+    border-top-right-radius: 5px;
 }
 
 .main #ball {

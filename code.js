@@ -32,6 +32,9 @@ class GameModel {
         this.paddleX = this.width / 2;
         this.paddleLeft = this.paddleX - this.paddleHalf;
         this.paddleRight = this.paddleX + this.paddleHalf;
+        this.paddleAngle1 = 0.2;
+        this.paddleAngle2 = 0.4;
+        this.paddleAngle3 = 0.6;
         // bricks
         this.bricks = []; // format: [x1, x2, y1, y2, id, type, color]
         this.bricks.push( // game area
@@ -155,6 +158,8 @@ class GameModel {
         this.speedExtra = 0;
         if (this.angle > Math.PI) 
             this.angle -= Math.PI + Math.PI;
+        if (Math.abs(this.angle) < 0.001) 
+            this.angle += 0.01
         var sina = Math.sin(this.angle);
         var cosa = Math.cos(this.angle);
         var minTime = Infinity;
@@ -307,7 +312,28 @@ class GameModel {
                     this.angle = - this.angle;
                 } else if (ev.type == 5) { // horizontal paddle bounce
                     if (this.ballX <= this.paddleRight && this.ballX >= this.paddleLeft) {
-                        this.angle = - this.angle;
+                        let paddleEight = this.paddleHalf * 0.25;
+                        if (this.ballX <= this.paddleLeft + paddleEight) {
+                            console.log('E1');
+                            this.angle = - this.angle - this.paddleAngle3;
+                        } else if (this.ballX <= this.paddleLeft + paddleEight + paddleEight) {
+                            console.log('E2');
+                            this.angle = - this.angle - this.paddleAngle2;
+                        } else if (this.ballX <= this.paddleLeft + paddleEight + paddleEight + paddleEight) {
+                            console.log('E3');
+                            this.angle = - this.angle - this.paddleAngle1;
+                        } else if (this.ballX >= this.paddleRight - paddleEight) {
+                            console.log('E8');
+                            this.angle = - this.angle + this.paddleAngle3;
+                        } else if (this.ballX >= this.paddleRight - paddleEight - paddleEight) {
+                            console.log('E7');
+                            this.angle = - this.angle + this.paddleAngle2;
+                        } else if (this.ballX >= this.paddleRight - paddleEight - paddleEight - paddleEight) {
+                            console.log('E6');
+                            this.angle = - this.angle + this.paddleAngle1;
+                        } else {
+                            this.angle = - this.angle;
+                        }
                         this.sq.push({type: 5, time: this.time}); // paddle sound
                     } else {
                         // paddle misses the ball
@@ -443,6 +469,7 @@ class GameView {
         this.scoreval.innerHTML = this.m.score;
     }
     async showMainStatus() {
+        this.render();
         // remove existing bricks
         const elementsToRemove = document.querySelectorAll('.brick');
         elementsToRemove.forEach(el => el.parentNode.removeChild(el));
@@ -685,13 +712,13 @@ class GameController {
     }
     mouseDown(e) {
         this.isDrag = true;
-        this.v.game.style.cursor = 'none';
-        this.v.paddle.style.cursor = 'none';
+        this.v.game.style.cursor = 'pointer';
+        //this.v.paddle.style.cursor = 'none';
     }
     mouseUp(e) {
         this.isDrag = false;
         this.v.game.style.cursor = 'default';
-        this.v.paddle.style.cursor = 'pointer';
+        //this.v.paddle.style.cursor = 'pointer';
     }
     mouseMove(e) {
         if (this.isDrag) {
