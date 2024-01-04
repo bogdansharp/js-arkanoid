@@ -94,15 +94,17 @@ class GameModel {
             }
         });
     }
-    loadLevel(level) {
+    loadLevel(level = null) {
         if (this.DEBUG)
             console.log(`loadLevel ${level}`);
+        this.bricks.splice(1, this.bricks.length - 1);
+        if (level === null) {
+            level = 0;
+            this.score = 0;
+        }
         if (level >= this.levels.length)
             return;
-        this.bricks.splice(1, this.bricks.length - 1);
         this.level = level;
-        if (level == 0)
-            this.score = 0;
         this.statusTitle = this.levels[level].title;
         let id = 1;
         for (let i = 0; i < this.levels[level].bricks.length; ++i) {
@@ -609,7 +611,7 @@ class GameController {
             // window resize
             window.addEventListener('resize', this.resize.bind(this));
             // New Game
-            this.startNewGame(0);
+            this.startNewGame(null);
             this.gameAreaShift = this.v.game.getBoundingClientRect().left;
         });
         // Settings
@@ -620,6 +622,7 @@ class GameController {
         this.gearBtn = document.getElementById("gear");
         this.doneBtn = document.getElementById("done");
         this.newBtn = document.getElementById("new");
+        this.nextBtn = document.getElementById("next");
         this.controls = document.getElementById("controls");
         this.active = true;
         this.controls.hidden = this.active;
@@ -627,6 +630,7 @@ class GameController {
         this.gearBtn.addEventListener('click', this.showControls, false);
         this.doneBtn.addEventListener('click', this.showControls, false);
         this.newBtn.addEventListener('click', this.newGameClick.bind(this), false);
+        this.nextBtn.addEventListener('click', this.nextLevelClick.bind(this), false);
         this.soundCheck = document.getElementById("sound");
         this.musicCheck = document.getElementById("music");
         this.soundCheck.checked = this.toPlaySounds;
@@ -782,7 +786,12 @@ class GameController {
     newGameClick(e) {
         this.active = true;
         this.controls.hidden = this.active;
-        this.startNewGame(0);
+        this.startNewGame(null);
+    }
+    nextLevelClick(e) {
+        this.active = true;
+        this.controls.hidden = this.active;
+        this.startNewGame((this.m.level + 1) % this.m.levels.length);
     }
 }
 
