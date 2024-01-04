@@ -5,7 +5,17 @@
 .main #info {
     position: absolute;
     width: 100%;
-    font-size: 14px;
+    font-size: 1.5vh;
+    bottom: 0px;
+}
+
+@container main (min-width: 300px) {
+    .main #info {
+        font-size: 2.2vh;
+    }
+    .main #gear{
+        width: 2.5vh;
+    }
 }
 
 .main #score {
@@ -22,7 +32,7 @@
     background-color: gainsboro;
     border: 1px black solid;
     top: 10px;
-    left: 10px;
+    left: 0px;
 }
 
 .main #paddle {
@@ -31,8 +41,7 @@
     width: 1px;
     height: 1px;
     background-color: coral;
-    border-top-left-radius: 5px;
-    border-top-right-radius: 5px;
+    border-radius: 5px;
 }
 
 .main #ball {
@@ -87,6 +96,7 @@
     margin-right: 10px;
     float: right;
     cursor: pointer;
+    width: 1.5vh;
 }
 
 .main #game .brick {

@@ -1,9 +1,9 @@
 class GameModel {
-    constructor(width, height) {
+    constructor() {
         const MIN_WIDTH = 128;
         const MIN_HEIGHT = 64;
         this.DEBUG = false;
-        // states: 0 - init, 1 - active, 2 - pause, 3 - missed, 666 - game over
+        // states: 0 - init, 1 - active, 2 - pause, 3 - missed, 6 - game over, 7 - level complete
         this.title = 'Bounce game';
         this.statusTitle = '';
         this.state = 0; // INITIALIZATION
@@ -15,14 +15,19 @@ class GameModel {
         this.scoreInterval = 1000; // 1 score for speed 0.1 each 1s
         this.SCORE_BRICK_DESTROY = 100;
         this.speedInterval = 20 * 1000; // speed up each 20s
-        if (width < MIN_WIDTH || height < MIN_HEIGHT) {
-            this.err = 1; // ERROR
-            this.errMsg = 'Width or Height is not enough for game';
-        }
+
+        // if (width < MIN_WIDTH || height < MIN_HEIGHT) {
+        //     this.err = 1; // ERROR
+        //     this.errMsg = 'Width or Height is not enough for game';
+        // }
+        //this.height = height - this.footerHeight;
+
         // Game Area parameters
-        this.width = width;
+        this.BRICK_WIDTH = 40;
+        this.BRICK_HEIGHT = 20;
+        this.width = this.BRICK_WIDTH * 16 + 1; // fixed
+        this.height = 652; // fixed 700
         this.footerHeight = 48;
-        this.height = height - this.footerHeight;
         // ball
         this.ballRadius = 8;
         this.ballDiam = this.ballRadius * 2;
@@ -40,9 +45,7 @@ class GameModel {
         // bricks
         this.bricks = []; // format: [x1, x2, y1, y2, id, type, color]
         this.bricks.push( // game area
-            [0, this.width, 0, this.height + this.footerHeight, 0, 1, 0xdcdcdc]); 
-        this.BRICK_WIDTH = 40;
-        this.BRICK_HEIGHT = 20;
+            [0, this.width, 0, this.height + this.footerHeight, 0, 1, 0xdcdcdc]);
         // levels
         this.levels = [];
         this.level = -1;
@@ -63,7 +66,7 @@ class GameModel {
         this.moveBall(0);
         // brick ids to remove (negative numbers - only change color to black)
         this.bq = [];
-        // game evens queue
+        // game events queue
         this.eq = [];
         // sound effects queue
         this.sq = [];
@@ -378,35 +381,27 @@ class GameView {
         this.m = model;
         // game area
         this.game = document.getElementById("game");
-        this.game.style.width = `${this.m.width}px`;
-        this.game.style.height = `${this.m.height + this.m.footerHeight}px`;
         // Info panel
         this.info = document.getElementById("info");
-        this.info.style.bottom = '10px';
-        this.info.style.top = 'auto';
         this.scoreval = document.getElementById("scoreval");
         this.status = document.getElementById("status");
+        this.gear = document.getElementById("gear");
         // Status Title
-        this.MAIN_STATUS_TIMEOUT = 3000;
+        this.MAIN_STATUS_TIMEOUT = 2000;
         this.mainstatus = document.getElementById("mainstatus");
         document.title = this.m.title;
         // ball
         this.ball = document.getElementById("ball");
-        this.ball.style.width = `${this.m.ballDiam}px`;
-        this.ball.style.height = `${this.m.ballDiam}px`;
-        this.ball.style.borderRadius = `${this.m.ballRadius}px`;
         this.newGame();
         // paddle
         this.paddle = document.getElementById("paddle");
-        this.paddle.style.width = `${this.m.paddleWidth}px`;
-        this.paddle.style.height = `${this.m.paddleHeight}px`;
-        this.paddle.style.top = `${this.m.paddleTop}px`;
+        // relative size
+        this.coef = 1.0;
+        this.resize();
         // Initialize Audio
         this.soundKeys = ['bounce', 'bounce2', 'gold', 'paddle', 'gameOver', 'win', 'music'];
         this.sounds = {};
         this.soundInitialized = false;
-        // draw objects
-        this.render();
     }
     initSound() {
         for (const key of this.soundKeys) {
@@ -417,10 +412,59 @@ class GameView {
         }
     }
     render() {
-        this.ball.style.top = `${Math.round(this.m.ballTop)}px`;
-        this.ball.style.left = `${Math.round(this.m.ballLeft)}px`;
-        this.paddle.style.left = `${Math.round(this.m.paddleLeft)}px`;
+        this.ball.style.top = `${Math.round(this.m.ballTop * this.coef)}px`;
+        this.ball.style.left = `${Math.round(this.m.ballLeft * this.coef)}px`;
+        this.paddle.style.left = `${Math.round(this.m.paddleLeft * this.coef)}px`;
         this.scoreval.innerHTML = this.m.score;
+    }
+    resize(ev) {
+        this.coef = 1.0;
+        let wcoef = (innerWidth - 2) / (this.m.width);
+        let hcoef = (innerHeight - 12) / (this.m.height + this.m.footerHeight);
+        let mincoef = Math.min(wcoef, hcoef);
+        if (mincoef >= 1.20 || mincoef < 1.0)
+            this.coef = mincoef;
+        // game area
+        let width = Math.round(this.coef * this.m.width);
+        let height = Math.round((this.m.height + this.m.footerHeight) * this.coef);
+        this.game.style.width = `${width}px`;
+        this.game.style.height = `${height}px`;
+        let leftMargin = Math.ceil((innerWidth - 2 - width) * 0.5);
+        this.game.style.marginLeft = `${leftMargin}px`;
+        this.info.style.bottom = `${Math.floor(this.coef * 15) - 3}px`;
+        let infoFontSize = width < 300 ? '1.5vh' : '2.2vh';
+        let infoGearSize = width < 300 ? '1.5vh' : '2.5vh';
+        this.info.style.fontSize = infoFontSize;
+        this.gear.style.width = infoGearSize;
+        // ball
+        let radius = Math.round(this.m.ballRadius * this.coef);
+        this.ball.style.width = `${radius + radius}px`;
+        this.ball.style.height = `${radius + radius}px`;
+        this.ball.style.borderRadius = `${radius}px`;
+        // paddle
+        let paddleWidth = Math.round(this.m.paddleWidth * this.coef);
+        let paddleHeight = Math.round(this.m.paddleHeight * this.coef);
+        let paddleTop = Math.round(this.m.paddleTop * this.coef);
+        this.paddle.style.width = `${paddleWidth}px`;
+        this.paddle.style.height = `${paddleHeight}px`;
+        this.paddle.style.top = `${paddleTop}px`;
+        // bricks
+        for (let i = 0; i < this.m.bricks.length; ++i) {
+            let [x1, x2, y1, y2, id, type, color] = this.m.bricks[i];
+            if (type == 1) continue; // game area
+            var newBrick = document.getElementById(`brick-${id}`);
+            if (! newBrick) continue;
+            x1 = Math.round(x1 * this.coef);
+            x2 = Math.round(x2 * this.coef);
+            y1 = Math.round(y1 * this.coef);
+            y2 = Math.round(y2 * this.coef);
+            newBrick.style.top = `${y1 + 1}px`;
+            newBrick.style.left = `${x1 + 1}px`;
+            newBrick.style.width = `${x2 - x1 - 2}px`;
+            newBrick.style.height = `${y2 - y1 - 2}px`;
+        }
+        // draw objects
+        this.render();
     }
     async showMainStatus() {
         this.render();
@@ -449,8 +493,12 @@ class GameView {
             if (type == 1) continue; // game area
             const newBrick = document.createElement('div');
             newBrick.style.backgroundColor = `#${color.toString(16).padStart(6, '0')}`;
-            newBrick.style.top = `${y1 + 2}px`;
-            newBrick.style.left = `${x1 + 2}px`;
+            x1 = Math.round(x1 * this.coef);
+            x2 = Math.round(x2 * this.coef);
+            y1 = Math.round(y1 * this.coef);
+            y2 = Math.round(y2 * this.coef);
+            newBrick.style.top = `${y1 + 1}px`;
+            newBrick.style.left = `${x1 + 1}px`;
             newBrick.style.width = `${x2 - x1 - 3}px`;
             newBrick.style.height = `${y2 - y1 - 3}px`;
             newBrick.id = `brick-${id}`;
@@ -528,10 +576,10 @@ class GameController {
         // Model, View
         this.m = null;
         this.v = null;
-        const BORDER_WIDTH = 10;
-        var width = innerWidth - BORDER_WIDTH * 2;
-        var height = innerHeight - BORDER_WIDTH * 2;
-        this.m = new GameModel(width, height);
+        // const BORDER_WIDTH = 10;
+        // var width = innerWidth - BORDER_WIDTH * 2;
+        // var height = innerHeight - BORDER_WIDTH * 2;
+        this.m = new GameModel();
         this.m.loadGameData().then( result => {
             if (this.m.err) {
                 if (this.m.state != 1)
@@ -540,8 +588,6 @@ class GameController {
                     console.log('ERROR:' + this.m.errMsg);
             }
             this.v = new GameView(this.m);
-            var rect = this.v.game.getBoundingClientRect();
-            this.gameAreaShift = rect.left;
             // Key handlers
             this.keyListener = this.keyListener.bind(this);
             document.addEventListener('keydown', this.keyListener, false);
@@ -560,8 +606,11 @@ class GameController {
             this.v.game.addEventListener('touchend', this.mouseUp, false);
             // click to release ball
             this.v.game.addEventListener('click', this.gameAreaClick, false);
+            // window resize
+            window.addEventListener('resize', this.resize.bind(this));
             // New Game
             this.startNewGame(0);
+            this.gameAreaShift = this.v.game.getBoundingClientRect().left;
         });
         // Settings
         this.toPlaySounds = false;
@@ -625,6 +674,10 @@ class GameController {
         this.v.render();
         this.timer = requestAnimationFrame(this.step);
     }
+    resize(e) {
+        this.v.resize();
+        this.gameAreaShift = this.v.game.getBoundingClientRect().left;
+    }
     processSoundEvents() {
         for (let i = 0; i < this.m.sq.length; ++i) { // process sound events
             var soundEvent = this.m.sq[i];
@@ -671,7 +724,7 @@ class GameController {
         }
     }
     gameAreaClick(e) {
-        if (this.m.state == 1 && this.m.ballOnPaddle) {
+        if (this.active && this.m.state == 1 && this.m.ballOnPaddle) {
             this.m.releaseBall(); }
     }
     mouseDown(e) {
@@ -688,8 +741,12 @@ class GameController {
         if (this.isDrag) {
             e.preventDefault();
             var delta = Math.round(performance.now() - this.perfTime);
-            var posX = e.clientX || e.targetTouches[0].pageX;
-            this.m.movePaddlePos(delta, posX - this.gameAreaShift);
+            if (e && ('clientX' in e || 'targetTouches' in e )) {
+                var posX = e.clientX || e.targetTouches[0].pageX;
+                this.m.movePaddlePos(delta, (posX - this.gameAreaShift) / this.v.coef);
+                if (this.DEBUG)
+                    console.log(`mouse move posx=${posX} coef=${this.v.coef} shift=${this.gameAreaShift}`);
+            }
         }
     }
     setSound(e) {
@@ -729,24 +786,8 @@ class GameController {
     }
 }
 
-class GameApp {
-    constructor() {
-        if (GameApp.instance) { 
-            GameApp.instance.kill();
-        }
-        GameApp.instance = this;
-        this.c = new GameController();
-    }
-    kill() {
-        if (this.c) {
-            this.c.kill(); }
-        this.c = null;
-    }
-}
-
 if (typeof(window.newGame) === 'undefined') {
-    window.newGame = (ev) => { new GameApp(); }
+    window.newGame = (ev) => { new GameController(); }
 }
 
 window.addEventListener('load', newGame);
-window.addEventListener('resize', newGame);
