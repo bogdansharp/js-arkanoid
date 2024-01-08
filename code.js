@@ -58,7 +58,7 @@ class GameModel {
         this.paddleLeft = this.paddleX - this.paddleHalf;
         this.paddleRight = this.paddleX + this.paddleHalf;
         // ball
-        this.speed = 0.1;
+        this.speed = 0.15;
         this.speedExtra = 0.0;
         this.angle = Math.PI / 3.0;
         this.ballX = this.width / 2;
@@ -330,7 +330,7 @@ class GameModel {
                 break;
             case 8: // speed up
                 this.moveBall(ev.time - this.time);
-                this.speedExtra += 0.05;
+                this.speedExtra += 0.025;
                 this.eq.push({type: 8, time: this.time + this.speedInterval}); 
                 break;
         }
